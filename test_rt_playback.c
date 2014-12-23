@@ -226,6 +226,8 @@ done:
 	/* terminate portaudio (MUST be called) */
 	Pa_Terminate();
 
+	sem_destroy(&sem);
+
 	/* free memory */
 	free((ctx.cb)->data);
 
