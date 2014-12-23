@@ -9,7 +9,6 @@
 
 /* #define SAMPLE_RATE 44100 */
 #define SAMPLE_RATE 22050
-#define NUM_SECONDS 2
 #define NUM_CHANNELS 2
 #define SAMPLE_SILENCE 0.0f
 
@@ -22,7 +21,6 @@ typedef struct {
 	int start;
 	/* unneeded counter, as we use the semaphore instead */
 	/* unsigned int count; */
-	float *end;
 	float *data;
 } CircularBuffer;
 
@@ -43,16 +41,18 @@ static void cb_init(CircularBuffer *cb, int size)
 }
 static float *cb_get_rptr(CircularBuffer *cb)
 {
-	sem_wait(&sem);
 	cb->start = (cb->start + 1) % cb->size;
 
-	return &cb->data[cb->start * BUF_SIZE];
+	/* counter decrement is done in the callback */
+
+	return &cb->data[cb->start * BUF_SIZE * NUM_CHANNELS];
 }
 
 static float *cb_get_wptr(CircularBuffer *cb)
 {
 	int count;
-	int end = (cb->start + sem_getvalue(&sem, &count)) % cb->size;
+	sem_getvalue(&sem, &count);
+	int end = (cb->start + count) % cb->size;
 
 	if (count == cb->size) {
 		/* cb is full, overwrite */
@@ -60,10 +60,10 @@ static float *cb_get_wptr(CircularBuffer *cb)
 		fprintf(stderr, "OVERWRITE\n");
 	}
 	else {
-		sem_post(&sem);
+		/* counter increment in the callback */
 	}
 
-	return  &cb->data[end * BUF_SIZE];
+	return  &cb->data[end * BUF_SIZE * NUM_CHANNELS];
 }
 
 static void die(const char *s, ...)
@@ -105,10 +105,11 @@ static int playCallback(const void *input, void *output,
 	if (!*ctx->running)
 		return paComplete;
 
+	sem_wait(&sem);
 	for (i = 0; i < frames_count; ++i) {
 		/* left and right */
-		*wptr++ = *rptr;
-		*wptr++ = *rptr;
+		*wptr++ = *rptr++;
+		*wptr++ = *rptr++;
 	}
 
 	return paContinue;
@@ -134,6 +135,11 @@ static int recordCallback(const void *input, void *output,
 	if (!*ctx->running)
 		return paComplete;
 
+	/* debug */
+	int value;
+	sem_getvalue(&sem, &value);
+	fprintf(stderr, "\r%d", value);
+
 	if (!input) {
 		for (i = 0; i < frames_count; ++i) {
 			/* left and right */
@@ -148,6 +154,8 @@ static int recordCallback(const void *input, void *output,
 			*wptr++ = *rptr++;
 		}
 	}
+
+	sem_post(&sem);
 
 	return paContinue;
 }
@@ -165,13 +173,14 @@ int main(void)
 	signal(SIGINT, sigint_handler);
 
 	/* init circular buffer */
-	cb_init(&cb, 10 * SAMPLE_RATE * NUM_CHANNELS);
+	cb_init(&cb, 20 * BUF_SIZE * NUM_CHANNELS);
 
 	/* init context */
 	ctx.running = &running;
 	ctx.cb = &cb;
+	ctx.cb->start = 0;
 
-	sem_init(&sem, 0, 2 * SAMPLE_RATE);
+	sem_init(&sem, 0, 10);
 
 	/* init portaudio */
 	err = Pa_Initialize();
@@ -196,7 +205,9 @@ int main(void)
 	/* do stuff */
 	printf("===\nPlease speak into the microphone.\n");
 
-	while ((err = Pa_IsStreamActive(inputStream)) == 1) {
+	/* FIXME */
+	while ((err = Pa_IsStreamActive(inputStream) 
+				& Pa_IsStreamActive(outputStream)) == 1) {
 		Pa_Sleep(100);
 	}
 	printf("\n");
@@ -215,9 +226,8 @@ done:
 	/* terminate portaudio (MUST be called) */
 	Pa_Terminate();
 
+	/* free memory */
 	free((ctx.cb)->data);
-
-	sem_destroy(&sem);
 
 	return err;
 }
