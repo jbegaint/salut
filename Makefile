@@ -1,5 +1,5 @@
 CFLAGS = -std=c99 -Wall -Wextra -Wshadow -pedantic -g
-LDFLAGS = -lportaudio
+LDFLAGS = -lportaudio -lpthread
 
 SRC = test_record_playback.c \
 	  test_rt_playback.c
