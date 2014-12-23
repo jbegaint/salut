@@ -36,7 +36,7 @@ static void cb_init(CircularBuffer *cb, int size)
 {
 	memset(cb, 0, sizeof(*cb));
 	cb->size = size;
-	cb->data = calloc(BUF_SIZE * size, sizeof(float));
+	cb->data = calloc(NUM_CHANNELS * BUF_SIZE * size, sizeof(float));
 	cb->start = 0;
 }
 static float *cb_get_rptr(CircularBuffer *cb)
@@ -173,7 +173,7 @@ int main(void)
 	signal(SIGINT, sigint_handler);
 
 	/* init circular buffer */
-	cb_init(&cb, 20 * BUF_SIZE * NUM_CHANNELS);
+	cb_init(&cb, 20);
 
 	/* init context */
 	ctx.running = &running;
@@ -206,7 +206,7 @@ int main(void)
 	printf("===\nPlease speak into the microphone.\n");
 
 	/* FIXME */
-	while ((err = Pa_IsStreamActive(inputStream) 
+	while ((err = Pa_IsStreamActive(inputStream)
 				& Pa_IsStreamActive(outputStream)) == 1) {
 		Pa_Sleep(100);
 	}
