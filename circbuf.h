@@ -11,7 +11,8 @@ typedef struct {
 	float *data;
 } CircularBuffer;
 
-void cb_init(CircularBuffer *cb, int size, int elt_size);
+/* void cb_init(CircularBuffer *cb, int size, int elt_size); */
+CircularBuffer *cb_init(int size, int elt_size);
 void cb_free(CircularBuffer *cb);
 
 float *cb_get_rptr(CircularBuffer *cb);

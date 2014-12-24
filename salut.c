@@ -27,10 +27,34 @@
 
 typedef struct {
 	int *running;
-	CircularBuffer *cb;
+	CircularBuffer *cb_in, *cb_out;
 } Context;
 
 static int running = 1;
+
+static void ctx_init(Context *ctx, int *running_ptr, int n_elt)
+{
+	CircularBuffer *cb_in, *cb_out;
+
+	/* init circular buffers */
+	cb_in = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE);
+	cb_out = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE);
+
+	/* init context */
+	ctx->running = running_ptr;
+	ctx->cb_in = cb_in;
+	ctx->cb_out = cb_out;
+}
+
+static void ctx_free(Context *ctx)
+{
+	/* free circular buffers */
+	cb_free(ctx->cb_in);
+	cb_free(ctx->cb_out);
+
+	/* free context */
+	free(ctx);
+}
 
 static void sigint_handler(int signum)
 {
@@ -61,7 +85,7 @@ static int playCallback(const void *input, void *output,
 		return paComplete;
 
 	/* get pointer to readable circbuf data */
-	rptr = cb_get_rptr(ctx->cb);
+	rptr = cb_get_rptr(ctx->cb_in);
 
 	for (i = 0; i < frames_count; ++i) {
 		/* left and right */
@@ -93,12 +117,12 @@ static int recordCallback(const void *input, void *output,
 		return paComplete;
 
 	/* DEBUG */
-	int value;
-	sem_getvalue(&ctx->cb->sem, &value);
-	fprintf(stderr, "\rSem value: [%d]", value);
+	/* int value; */
+	/* sem_getvalue(&ctx->cb->sem, &value); */
+	/* fprintf(stderr, "\rSem value: [%d]", value); */
 
 	/* get pointer to writale data circbuf data */
-	wptr = cb_get_wptr(ctx->cb);
+	wptr = cb_get_wptr(ctx->cb_in);
 
 	if (!input) {
 		for (i = 0; i < frames_count; ++i) {
@@ -116,7 +140,7 @@ static int recordCallback(const void *input, void *output,
 	}
 
 	/* all done */
-	cb_increment_count(ctx->cb);
+	cb_increment_count(ctx->cb_in);
 
 	return paContinue;
 }
@@ -127,8 +151,7 @@ int main(int argc, char **argv)
 	PaStream *inputStream;
 	PaStream *outputStream;
 
-	CircularBuffer cb;
-	Context ctx;
+	Context *ctx = calloc(1, sizeof(*ctx));
 
 	int socket_fd;
 	struct sockaddr_in myaddr;
@@ -193,15 +216,10 @@ int main(int argc, char **argv)
 		printf("[MSG FROM SERVER]: %s\n", buffer);
 	}
 
-	close(socket_fd);
-	exit(EXIT_SUCCESS);
+	/* close(socket_fd); */
+	/* exit(EXIT_SUCCESS); */
 
-	/* init circular buffer */
-	cb_init(&cb, 20, NUM_CHANNELS * BUF_SIZE);
-
-	/* init context */
-	ctx.running = &running;
-	ctx.cb = &cb;
+	ctx_init(ctx, &running, 20);
 
 	/* init portaudio */
 	err = Pa_Initialize();
@@ -209,12 +227,12 @@ int main(int argc, char **argv)
 
 	/* open default input stream for playing */
 	err = Pa_OpenDefaultStream(&inputStream, 2, 0, paFloat32, SAMPLE_RATE, 256,
-			recordCallback, &ctx);
+			recordCallback, ctx);
 	handle_pa_error(err);
 
 	/* open default output stream for playback */
 	err = Pa_OpenDefaultStream(&outputStream, 0, 2, paFloat32, SAMPLE_RATE, 256,
-			playCallback, &ctx);
+			playCallback, ctx);
 	handle_pa_error(err);
 
 	/* start streams */
@@ -248,8 +266,7 @@ done:
 	Pa_Terminate();
 
 	close(socket_fd);
-
-	cb_free(ctx.cb);
+	ctx_free(ctx);
 
 	return err;
 }

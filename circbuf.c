@@ -6,9 +6,9 @@
 #include "circbuf.h"
 #include "utils.h"
 
-void cb_init(CircularBuffer *cb, int size, int elt_size)
+CircularBuffer *cb_init(int size, int elt_size)
 {
-	memset(cb, 0, sizeof(*cb));
+	CircularBuffer *cb = calloc(1, sizeof(*cb));
 
 	/* fill struct info */
 	cb->size = size;
@@ -21,6 +21,8 @@ void cb_init(CircularBuffer *cb, int size, int elt_size)
 	/* init the semaphore */
 	if (sem_init(&cb->sem, 0, 10) == -1)
 		errno_die();
+
+	return cb;
 }
 
 void cb_free(CircularBuffer *cb)
