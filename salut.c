@@ -97,9 +97,6 @@ static int playCallback(const void *input, void *output,
 		return paComplete;
 
 	/* get pointer to readable circbuf data */
-	/* FIXME */
-	if (sem_wait(&ctx->cb_in->sem) == -1)
-		errno_die();
 	rptr = cb_get_rptr(ctx->cb_in);
 
 	for (i = 0; i < frames_count; ++i) {
@@ -155,6 +152,35 @@ static int recordCallback(const void *input, void *output,
 	return paContinue;
 }
 
+static void *send_thread_routine(void *arg)
+{
+	Context *ctx = (Context *) arg;
+	int s = *ctx->socket_fd;
+	float *rptr = NULL;
+	size_t sz = ctx->cb_out->elt_size;
+
+	while (*ctx->running) {
+		/* /1* send data *1/ */
+		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
+		/* 	if (errno == EAGAIN) { */
+		/* 		/1* nope *1/ */
+		/* 		/1* continue *1/ */
+		/* 	} */
+		/* 	else { */
+		/* 		errno_die(); */
+		/* 	} */
+		/* } */
+		/* else { */
+		rptr = cb_get_rptr(ctx->cb_out);
+
+		/* TODO: LPC */
+		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+		/* } */
+	}
+
+	return NULL;
+}
+
 static void *udp_thread_routine(void *arg)
 {
 	Context *ctx = (Context *) arg;
@@ -192,22 +218,22 @@ static void *udp_thread_routine(void *arg)
 			cb_increment_count(ctx->cb_in);
 		}
 
-		/* send data */
-		if (sem_trywait(&ctx->cb_out->sem) == -1) {
-			if (errno == EAGAIN) {
-				/* nope */
-				/* continue */
-			}
-			else {
-				errno_die();
-			}
-		}
-		else {
-			rptr = cb_get_rptr(ctx->cb_out);
+		/* /1* send data *1/ */
+		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
+		/* 	if (errno == EAGAIN) { */
+		/* 		/1* nope *1/ */
+		/* 		/1* continue *1/ */
+		/* 	} */
+		/* 	else { */
+		/* 		errno_die(); */
+		/* 	} */
+		/* } */
+		/* else { */
+		/* 	rptr = cb_get_rptr(ctx->cb_out); */
 
-			/* TODO: LPC */
-			send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
-		}
+		/* 	/1* TODO: LPC *1/ */
+		/* 	send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size); */
+		/* } */
 
 		/* DEBUG */
 		int vin, vout;
@@ -229,6 +255,7 @@ int main(int argc, char **argv)
 
 	Context *ctx = calloc(1, sizeof(*ctx));
 	pthread_t udp_thread;
+	pthread_t send_thread;
 
 	int socket_fd;
 	struct sockaddr_in myaddr;
@@ -329,6 +356,9 @@ int main(int argc, char **argv)
 	if (pthread_create(&udp_thread, NULL, udp_thread_routine, ctx) != 0)
 		errno_die();
 
+	if (pthread_create(&send_thread, NULL, send_thread_routine, ctx) != 0)
+		errno_die();
+
 	/* FIXME */
 	while ((err = Pa_IsStreamActive(inputStream)
 				& Pa_IsStreamActive(outputStream)) == 1) {
@@ -352,8 +382,9 @@ done:
 
 	if (pthread_join(udp_thread, NULL) != 0)
 		errno_die();
-	/* if (pthread_mutex_destroy(&lock) != 0) */
-	/* 	errno_die(); */
+
+	if (pthread_join(send_thread, NULL) != 0)
+		errno_die();
 
 	fprintf(stderr, "Closing socket...");
 	close(socket_fd);
