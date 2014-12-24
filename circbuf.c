@@ -4,6 +4,7 @@
 #include <semaphore.h>
 
 #include "circbuf.h"
+#include "utils.h"
 
 void cb_init(CircularBuffer *cb, int size, int elt_size)
 {
@@ -18,12 +19,14 @@ void cb_init(CircularBuffer *cb, int size, int elt_size)
 	cb->data = calloc(cb->elt_size * size, sizeof(float));
 
 	/* init the semaphore */
-	sem_init(&cb->sem, 0, 10);
+	if (sem_init(&cb->sem, 0, 10) == -1)
+		errno_die();
 }
 
 void cb_free(CircularBuffer *cb)
 {
-	sem_destroy(&cb->sem);
+	if (sem_destroy(&cb->sem) == -1)
+		errno_die();
 
 	/* free memory */
 	free(cb->data);
@@ -31,7 +34,8 @@ void cb_free(CircularBuffer *cb)
 
 float *cb_get_rptr(CircularBuffer *cb)
 {
-	sem_wait(&cb->sem);
+	if (sem_wait(&cb->sem) == -1)
+		errno_die();
 
 	cb->start = (cb->start + 1) % cb->size;
 
@@ -58,6 +62,5 @@ float *cb_get_wptr(CircularBuffer *cb)
 void cb_increment_count(CircularBuffer *cb)
 {
 	if (sem_post(&cb->sem) == -1)
-		/* FIXME */
-		fprintf(stderr, "error...\n");
+		errno_die();
 }

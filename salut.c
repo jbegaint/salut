@@ -8,6 +8,7 @@
 #include <portaudio.h>
 
 #include "circbuf.h"
+#include "utils.h"
 
 /* #define SAMPLE_RATE 44100 */
 #define SAMPLE_RATE 22050
