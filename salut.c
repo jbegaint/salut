@@ -157,7 +157,7 @@ static void *udp_thread_routine(void *arg)
 	Context *ctx = (Context *) arg;
 	int s = *ctx->socket_fd;
 	float *wptr = NULL, *rptr = NULL;
-	int rc, sn, sel;
+	int sel;
 
 	size_t sz = ctx->cb_in->elt_size;
 
@@ -170,7 +170,7 @@ static void *udp_thread_routine(void *arg)
 
 		struct timeval tv;
 		tv.tv_sec = 0;
-		tv.tv_usec = 100000;
+		tv.tv_usec = 1000;
 
 		do {
 			sel = select(s + 1, &fd, NULL, NULL, &tv);
@@ -183,10 +183,7 @@ static void *udp_thread_routine(void *arg)
 			/* read received data */
 			wptr = cb_get_wptr(ctx->cb_in);
 
-			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
-			if (rc == 0) {
-				die("peer was disconnected\n");
-			}
+			recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
 
 			/* all done */
 			cb_increment_count(ctx->cb_in);
@@ -195,23 +192,25 @@ static void *udp_thread_routine(void *arg)
 		/* send data */
 		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
 		/* 	if (errno == EAGAIN) { */
-		/* 		continue; */
+		/* 		/1* nope *1/ */
+		/* 		/1* continue *1/ */
 		/* 	} */
 		/* 	else { */
 		/* 		errno_die(); */
 		/* 	} */
 		/* } */
-		rptr = cb_get_rptr(ctx->cb_out);
-		/* FIXME:  LPC ? */
+		/* else { */
+			rptr = cb_get_rptr(ctx->cb_out);
 
-		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+			/* TODO: LPC */
+			send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+		/* } */
 
 		/* DEBUG */
 		int vin, vout;
 		sem_getvalue(&ctx->cb_in->sem, &vin);
 		sem_getvalue(&ctx->cb_out->sem, &vout);
 		fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
-
 	}
 
 	free(buf);
