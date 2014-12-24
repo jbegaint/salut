@@ -1,13 +1,19 @@
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
-#include <signal.h>
 #include <string.h>
-#include <semaphore.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <sys/types.h>
 
 #include <portaudio.h>
 
 #include "circbuf.h"
+#include "udp.h"
 #include "utils.h"
 
 /* #define SAMPLE_RATE 44100 */
@@ -115,7 +121,7 @@ static int recordCallback(const void *input, void *output,
 	return paContinue;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	PaError err = paNoError;
 	PaStream *inputStream;
@@ -124,8 +130,73 @@ int main(void)
 	CircularBuffer cb;
 	Context ctx;
 
+	int socket_fd;
+	struct sockaddr_in myaddr;
+	struct sockaddr_in peeraddr;
+	socklen_t socklen = sizeof(struct sockaddr_in);
+
 	/* signal catching */
 	signal(SIGINT, sigint_handler);
+
+	/* init udp socket */
+	socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (socket_fd == -1)
+		errno_die();
+
+	const char *msg = "Hello World!";
+	int rc;
+	int buf_len = 256;
+	char buffer[256];
+
+	init_peer_addr(&myaddr, INADDR_ANY);
+
+	/* LOCALHOST TESTING ONLY */
+	if (argc != 1) {
+		/* client mode */
+		myaddr.sin_port = DFLT_PORT + 1;
+	}
+
+	/* bind socket */
+	if (bind(socket_fd, (struct sockaddr *) &myaddr, sizeof(myaddr)) < 0)
+		errno_die();
+
+	if (argc == 1) {
+		/* server mode */
+		fprintf(stderr, "Server mode...\n");
+
+		fprintf(stderr, "wainting for msg...\n");
+
+		recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+		printf("[MSG FROM CLIENT]: %s\n", buffer);
+
+		sendto(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, socklen);
+		send_msg(socket_fd, &peeraddr, buffer, strlen(buffer) + 1);
+	}
+	else {
+		/* client mode */
+		fprintf(stderr, "Client mode...\n");
+
+		/* FIXME: USE ARGV */
+		char *host_name = "127.0.0.1";
+		struct hostent *hp;
+		hp = gethostbyname(host_name);
+
+		init_peer_addr(&peeraddr, INADDR_ANY);
+		/* copy peer addr */
+		memcpy(&peeraddr.sin_addr, hp->h_addr_list[0], hp->h_length);
+
+		fprintf(stderr, "sending msg...\n");
+
+		rc = send_msg(socket_fd, &peeraddr, msg, strlen(msg) + 1);
+		if (rc < 0)
+			errno_die();
+
+		recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+		printf("[MSG FROM SERVER]: %s\n", buffer);
+	}
+
+	close(socket_fd);
+	exit(EXIT_SUCCESS);
 
 	/* init circular buffer */
 	cb_init(&cb, 20, NUM_CHANNELS * BUF_SIZE);
@@ -177,6 +248,8 @@ int main(void)
 done:
 	/* terminate portaudio (MUST be called) */
 	Pa_Terminate();
+
+	close(socket_fd);
 
 	cb_free(ctx.cb);
 

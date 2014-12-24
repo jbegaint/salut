@@ -1,4 +1,4 @@
-CFLAGS = -std=c99 -Wall -Wextra -Wshadow -pedantic -g
+CFLAGS = -std=gnu99 -Wall -Wextra -Wshadow -pedantic -g
 LDFLAGS = -lportaudio -lpthread
 
 SRC = $(wildcard *.c)
