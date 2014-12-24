@@ -36,8 +36,8 @@ void cb_free(CircularBuffer *cb)
 
 float *cb_get_rptr(CircularBuffer *cb)
 {
-	if (sem_wait(&cb->sem) == -1)
-		errno_die();
+	/* if (sem_wait(&cb->sem) == -1) */
+	/* 	errno_die(); */
 
 	cb->start = (cb->start + 1) % cb->size;
 

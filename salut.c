@@ -97,6 +97,9 @@ static int playCallback(const void *input, void *output,
 		return paComplete;
 
 	/* get pointer to readable circbuf data */
+	/* FIXME */
+	if (sem_wait(&ctx->cb_in->sem) == -1)
+		errno_die();
 	rptr = cb_get_rptr(ctx->cb_in);
 
 	for (i = 0; i < frames_count; ++i) {
