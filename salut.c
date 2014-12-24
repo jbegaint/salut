@@ -204,6 +204,7 @@ static void *udp_thread_routine(void *arg)
 			/* send data */
 			if (sem_trywait(&ctx->cb_out->sem) == -1) {
 				if (errno == EAGAIN) {
+					fprintf(stderr, "EAGAIN\n");
 					continue;
 				}
 				else {
