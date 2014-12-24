@@ -19,7 +19,7 @@ void init_peer_addr(struct sockaddr_in *peer_addr, int host)
 	peer_addr->sin_addr.s_addr = htonl(host);
 }
 
-int send_msg(int fd, struct sockaddr_in *addr_ptr, const char *msg, size_t sz)
+int send_msg(int fd, struct sockaddr_in *addr_ptr, const void *msg, size_t sz)
 {
 	int sn;
 	socklen_t socklen = sizeof(struct sockaddr_in);
@@ -32,7 +32,7 @@ int send_msg(int fd, struct sockaddr_in *addr_ptr, const char *msg, size_t sz)
 	return sn;
 }
 
-int recv_msg(int fd, struct sockaddr_in *addr_ptr, char *buf, size_t buf_len)
+int recv_msg(int fd, struct sockaddr_in *addr_ptr, void *buf, size_t buf_len)
 {
 	int rc;
 	socklen_t socklen = sizeof(struct sockaddr_in);

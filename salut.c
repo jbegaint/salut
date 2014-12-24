@@ -1,15 +1,19 @@
 #include <arpa/inet.h>
-#include <unistd.h>
+#include <errno.h>
+#include <netdb.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
-#include <netdb.h>
+#include <sys/time.h>
 #include <sys/types.h>
-
+#include <time.h>
+#include <unistd.h>
 #include <portaudio.h>
 
 #include "circbuf.h"
@@ -27,10 +31,15 @@
 
 typedef struct {
 	int *running;
+	int *socket_fd;
+
 	CircularBuffer *cb_in, *cb_out;
+
+	struct sockaddr_in *myaddr, *peeraddr;
 } Context;
 
 static int running = 1;
+/* static pthread_mutex_t lock; */
 
 static void ctx_init(Context *ctx, int *running_ptr, int n_elt)
 {
@@ -60,7 +69,10 @@ static void sigint_handler(int signum)
 {
 	UNUSED(signum);
 
+	/* pthread_mutex_lock(&lock); */
 	running = 0;
+	/* pthread_mutex_unlock(&lock); */
+
 	fprintf(stderr, "Exiting...\n");
 }
 
@@ -118,11 +130,11 @@ static int recordCallback(const void *input, void *output,
 
 	/* DEBUG */
 	/* int value; */
-	/* sem_getvalue(&ctx->cb->sem, &value); */
+	/* sem_getvalue(&ctx->cb_out->sem, &value); */
 	/* fprintf(stderr, "\rSem value: [%d]", value); */
 
-	/* get pointer to writale data circbuf data */
-	wptr = cb_get_wptr(ctx->cb_in);
+	/* get pointer to writable circbuf data */
+	wptr = cb_get_wptr(ctx->cb_out);
 
 	if (!input) {
 		for (i = 0; i < frames_count; ++i) {
@@ -140,9 +152,66 @@ static int recordCallback(const void *input, void *output,
 	}
 
 	/* all done */
-	cb_increment_count(ctx->cb_in);
+	cb_increment_count(ctx->cb_out);
 
 	return paContinue;
+}
+
+static void *udp_thread_routine(void *arg)
+{
+	Context *ctx = (Context *) arg;
+	int s = *ctx->socket_fd;
+	float *wptr = NULL, *rptr = NULL;
+	int rc, sn, sel;
+
+	size_t sz = ctx->cb_in->elt_size;
+
+	while (*ctx->running) {
+	/* while (1) { */
+
+	/* 	pthread_mutex_lock(&lock); */
+	/* 	if (!*ctx->running) */
+	/* 		return NULL; */
+	/* 	pthread_mutex_unlock(&lock); */
+
+		fd_set fd;
+		FD_ZERO(&fd);
+		FD_SET(s, &fd);
+
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 100;
+
+		sel = select(s + 1, &fd, NULL, NULL, &tv);
+
+		if (sel == -1) {
+			if (errno != EINTR) {
+				errno_die();
+			}
+		}
+		else if (sel > 0) {
+			/* read received data */
+			wptr = cb_get_wptr(ctx->cb_in);
+
+			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
+			/* FIXME: error on rc */
+			UNUSED(rc);
+
+			/* copy data */
+			cb_increment_count(ctx->cb_in);
+		}
+		else {
+			/* send data */
+			rptr = cb_get_rptr(ctx->cb_out);
+			/* FIXME: blocking ? */
+
+			sn = send_msg(s, ctx->myaddr, rptr, sizeof(float) * sz);
+			/* FIXME: error on send */
+			UNUSED(sn);
+		}
+	}
+
+	return NULL;
 }
 
 int main(int argc, char **argv)
@@ -152,6 +221,7 @@ int main(int argc, char **argv)
 	PaStream *outputStream;
 
 	Context *ctx = calloc(1, sizeof(*ctx));
+	pthread_t udp_thread;
 
 	int socket_fd;
 	struct sockaddr_in myaddr;
@@ -186,7 +256,7 @@ int main(int argc, char **argv)
 		/* server mode */
 		fprintf(stderr, "Server mode...\n");
 
-		fprintf(stderr, "wainting for msg...\n");
+		fprintf(stderr, "waiting for msg...\n");
 
 		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
 		printf("[MSG FROM CLIENT]: %s\n", buffer);
@@ -198,6 +268,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Client mode...\n");
 
 		/* FIXME: USE ARGV */
+		UNUSED(argv);
 		char *host_name = "127.0.0.1";
 		struct hostent *hp;
 		hp = gethostbyname(host_name);
@@ -216,10 +287,11 @@ int main(int argc, char **argv)
 		printf("[MSG FROM SERVER]: %s\n", buffer);
 	}
 
-	/* close(socket_fd); */
-	/* exit(EXIT_SUCCESS); */
-
+	/* init context */
 	ctx_init(ctx, &running, 20);
+	ctx->socket_fd = &socket_fd;
+	ctx->peeraddr = &peeraddr;
+	ctx->myaddr = &myaddr;
 
 	/* init portaudio */
 	err = Pa_Initialize();
@@ -244,6 +316,13 @@ int main(int argc, char **argv)
 	/* do stuff */
 	printf("===\nPlease speak into the microphone.\n");
 
+	/* start connection thread */
+	/* if (pthread_mutex_init(&lock, NULL) != 0) */
+	/* 	errno_die(); */
+
+	if (pthread_create(&udp_thread, NULL, udp_thread_routine, ctx) != 0)
+		errno_die();
+
 	/* FIXME */
 	while ((err = Pa_IsStreamActive(inputStream)
 				& Pa_IsStreamActive(outputStream)) == 1) {
@@ -265,8 +344,18 @@ done:
 	/* terminate portaudio (MUST be called) */
 	Pa_Terminate();
 
+	if (pthread_join(udp_thread, NULL) != 0)
+		errno_die();
+	/* if (pthread_mutex_destroy(&lock) != 0) */
+	/* 	errno_die(); */
+
+	fprintf(stderr, "Closing socket...");
 	close(socket_fd);
+	fprintf(stderr, " done.\n");
+
+	fprintf(stderr, "Freeing context...");
 	ctx_free(ctx);
+	fprintf(stderr, " done.\n");
 
 	return err;
 }
