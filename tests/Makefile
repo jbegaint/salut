@@ -1,16 +1,19 @@
 CFLAGS = -std=c99 -Wall -Wextra -Wshadow -pedantic -g
 LDFLAGS = -lportaudio -lpthread
 
-SRC = $(wildcard *.c)
-OBJ = $(SRC:.c=.o)
+SRC = test_record_playback.c \
+	  test_rt_playback.c
 
-BIN = salut
+OBJ = $(SRC:.c=.o)
+BIN = $(SRC:.c=)
 
 all: $(BIN)
 
-$(BIN): $(OBJ)
+$(OBJ):
+
+.o:
 	@echo "LD $@"
-	@gcc $^ -o $@ $(LDFLAGS)
+	@gcc $< -o $@ $(LDFLAGS)
 
 %.o: %.c
 	@echo "CC $<"
