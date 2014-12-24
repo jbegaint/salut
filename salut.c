@@ -170,26 +170,25 @@ static void *udp_thread_routine(void *arg)
 
 		struct timeval tv;
 		tv.tv_sec = 0;
-		/* tv.tv_usec = 10000; */
-		tv.tv_usec = 10000;
+		tv.tv_usec = 100000;
 
-		sel = select(s + 1, &fd, NULL, NULL, &tv);
+		do {
+			sel = select(s + 1, &fd, NULL, NULL, &tv);
+		} while ((sel == -1) && (errno == EINTR));
 
-		if (sel == -1) {
-			if (errno != EINTR) {
-				errno_die();
-			}
-		}
-		/* if (sel > 0) { */
+		if (sel == -1)
+			errno_die();
+
 		if (FD_ISSET(s, &fd)) {
 			/* read received data */
 			wptr = cb_get_wptr(ctx->cb_in);
 
 			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
-			/* FIXME: error on rc */
-			UNUSED(rc);
+			if (rc == 0) {
+				die("peer was disconnected\n");
+			}
 
-			/* all data */
+			/* all done */
 			cb_increment_count(ctx->cb_in);
 		}
 

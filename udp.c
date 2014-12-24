@@ -41,7 +41,6 @@ int recv_msg(int fd, struct sockaddr_in *addr_ptr, void *buf, size_t buf_len)
 
 	if (rc == -1)
 		errno_die();
-	/* TODO: rc == 0 */
 
 	return rc;
 }
