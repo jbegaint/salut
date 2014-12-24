@@ -27,6 +27,8 @@
 
 #define BUF_SIZE 256
 
+#define MAX_LEN 256
+
 #define handle_pa_error(err) if (err != paNoError) goto done
 
 typedef struct {
@@ -39,10 +41,10 @@ typedef struct {
 } Context;
 
 static int running = 1;
-/* static pthread_mutex_t lock; */
 
-static void ctx_init(Context *ctx, int *running_ptr, int n_elt)
+static Context *ctx_init(int *running_ptr, int n_elt)
 {
+	Context *ctx = calloc(1, sizeof(*ctx));
 	CircularBuffer *cb_in, *cb_out;
 
 	/* init circular buffers */
@@ -53,6 +55,8 @@ static void ctx_init(Context *ctx, int *running_ptr, int n_elt)
 	ctx->running = running_ptr;
 	ctx->cb_in = cb_in;
 	ctx->cb_out = cb_out;
+
+	return ctx;
 }
 
 static void ctx_free(Context *ctx)
@@ -69,9 +73,7 @@ static void sigint_handler(int signum)
 {
 	UNUSED(signum);
 
-	/* pthread_mutex_lock(&lock); */
 	running = 0;
-	/* pthread_mutex_unlock(&lock); */
 
 	fprintf(stderr, "Exiting...\n");
 }
@@ -155,42 +157,28 @@ static int recordCallback(const void *input, void *output,
 static void *send_thread_routine(void *arg)
 {
 	Context *ctx = (Context *) arg;
-	int s = *ctx->socket_fd;
 	float *rptr = NULL;
+	int s = *ctx->socket_fd;
 	size_t sz = ctx->cb_out->elt_size;
 
 	while (*ctx->running) {
-		/* /1* send data *1/ */
-		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
-		/* 	if (errno == EAGAIN) { */
-		/* 		/1* nope *1/ */
-		/* 		/1* continue *1/ */
-		/* 	} */
-		/* 	else { */
-		/* 		errno_die(); */
-		/* 	} */
-		/* } */
-		/* else { */
+		/* send data */
 		rptr = cb_get_rptr(ctx->cb_out);
 
 		/* TODO: LPC */
-		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
-		/* } */
+		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * sz);
 	}
 
 	return NULL;
 }
 
-static void *udp_thread_routine(void *arg)
+static void *read_thread_routine(void *arg)
 {
 	Context *ctx = (Context *) arg;
+	float *wptr = NULL;
 	int s = *ctx->socket_fd;
-	float *wptr = NULL, *rptr = NULL;
 	int sel;
-
 	size_t sz = ctx->cb_in->elt_size;
-
-	float *buf = calloc(sz, sizeof(*buf));
 
 	while (*ctx->running) {
 		fd_set fd;
@@ -199,7 +187,7 @@ static void *udp_thread_routine(void *arg)
 
 		struct timeval tv;
 		tv.tv_sec = 0;
-		tv.tv_usec = 10;
+		tv.tv_usec = 10000;
 
 		do {
 			sel = select(s + 1, &fd, NULL, NULL, &tv);
@@ -218,31 +206,12 @@ static void *udp_thread_routine(void *arg)
 			cb_increment_count(ctx->cb_in);
 		}
 
-		/* /1* send data *1/ */
-		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
-		/* 	if (errno == EAGAIN) { */
-		/* 		/1* nope *1/ */
-		/* 		/1* continue *1/ */
-		/* 	} */
-		/* 	else { */
-		/* 		errno_die(); */
-		/* 	} */
-		/* } */
-		/* else { */
-		/* 	rptr = cb_get_rptr(ctx->cb_out); */
-
-		/* 	/1* TODO: LPC *1/ */
-		/* 	send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size); */
-		/* } */
-
 		/* DEBUG */
 		int vin, vout;
 		sem_getvalue(&ctx->cb_in->sem, &vin);
 		sem_getvalue(&ctx->cb_out->sem, &vout);
 		fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
 	}
-
-	free(buf);
 
 	return NULL;
 }
@@ -253,9 +222,8 @@ int main(int argc, char **argv)
 	PaStream *inputStream;
 	PaStream *outputStream;
 
-	Context *ctx = calloc(1, sizeof(*ctx));
-	pthread_t udp_thread;
-	pthread_t send_thread;
+	Context *ctx;
+	pthread_t read_thread, send_thread;
 
 	int socket_fd;
 	struct sockaddr_in myaddr;
@@ -270,7 +238,6 @@ int main(int argc, char **argv)
 		errno_die();
 
 	const char *msg = "Hello World!";
-	int rc;
 	int buf_len = 256;
 	char buffer[256];
 
@@ -290,8 +257,7 @@ int main(int argc, char **argv)
 		/* server mode */
 		fprintf(stderr, "Server mode...\n");
 
-		fprintf(stderr, "waiting for msg...\n");
-
+		/* waiting for a peer */
 		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
 		printf("[MSG FROM CLIENT]: %s\n", buffer);
 
@@ -310,18 +276,35 @@ int main(int argc, char **argv)
 		/* copy peer addr */
 		memcpy(&peeraddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
-		fprintf(stderr, "sending msg...\n");
+		/* sending hello message */
+		send_msg(socket_fd, &peeraddr, msg, strlen(msg) + 1);
 
-		rc = send_msg(socket_fd, &peeraddr, msg, strlen(msg) + 1);
-		if (rc < 0)
+		socklen_t socklen = sizeof(struct sockaddr_in);
+		int rc;
+		struct timeval tv;
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
+		/* set socket timeout option */
+		if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 			errno_die();
+		}
 
-		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
-		printf("[MSG FROM SERVER]: %s\n", buffer);
+		/* waiting for the peer to respond */
+		rc = recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+		if (rc == -1) {
+			if (errno == EAGAIN) {
+				fprintf(stderr, "No response from peer, exiting.\n");
+				close(socket_fd);
+				exit(EXIT_FAILURE);
+			}
+			errno_die();
+		}
+		printf("[MSG FROM PEER]: %s\n", buffer);
 	}
 
 	/* init context */
-	ctx_init(ctx, &running, 20);
+	ctx = ctx_init(&running, 20);
 	ctx->socket_fd = &socket_fd;
 	ctx->peeraddr = &peeraddr;
 	ctx->myaddr = &myaddr;
@@ -349,11 +332,8 @@ int main(int argc, char **argv)
 	/* do stuff */
 	printf("===\nPlease speak into the microphone.\n");
 
-	/* start connection thread */
-	/* if (pthread_mutex_init(&lock, NULL) != 0) */
-	/* 	errno_die(); */
-
-	if (pthread_create(&udp_thread, NULL, udp_thread_routine, ctx) != 0)
+	/* start threads for receiving and sending data */
+	if (pthread_create(&read_thread, NULL, read_thread_routine, ctx) != 0)
 		errno_die();
 
 	if (pthread_create(&send_thread, NULL, send_thread_routine, ctx) != 0)
@@ -367,32 +347,25 @@ int main(int argc, char **argv)
 	printf("\n");
 
 	/* close streams */
-	fprintf(stderr, "Closing streams...");
-
 	err = Pa_CloseStream(inputStream);
 	handle_pa_error(err);
 	err = Pa_CloseStream(outputStream);
 	handle_pa_error(err);
 
-	fprintf(stderr, " done.\n");
-
 done:
 	/* terminate portaudio (MUST be called) */
 	Pa_Terminate();
 
-	if (pthread_join(udp_thread, NULL) != 0)
+	/* waiting for the threads to finish */
+	if (pthread_join(read_thread, NULL) != 0)
 		errno_die();
 
 	if (pthread_join(send_thread, NULL) != 0)
 		errno_die();
 
-	fprintf(stderr, "Closing socket...");
+	/* clean up */
 	close(socket_fd);
-	fprintf(stderr, " done.\n");
-
-	fprintf(stderr, "Freeing context...");
 	ctx_free(ctx);
-	fprintf(stderr, " done.\n");
 
 	return err;
 }
