@@ -133,7 +133,6 @@ int main(int argc, char **argv)
 	int socket_fd;
 	struct sockaddr_in myaddr;
 	struct sockaddr_in peeraddr;
-	socklen_t socklen = sizeof(struct sockaddr_in);
 
 	/* signal catching */
 	signal(SIGINT, sigint_handler);
@@ -166,10 +165,9 @@ int main(int argc, char **argv)
 
 		fprintf(stderr, "wainting for msg...\n");
 
-		recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
 		printf("[MSG FROM CLIENT]: %s\n", buffer);
 
-		sendto(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, socklen);
 		send_msg(socket_fd, &peeraddr, buffer, strlen(buffer) + 1);
 	}
 	else {
@@ -191,7 +189,7 @@ int main(int argc, char **argv)
 		if (rc < 0)
 			errno_die();
 
-		recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
 		printf("[MSG FROM SERVER]: %s\n", buffer);
 	}
 
