@@ -1,0 +1,27 @@
+{
+	<Portaudio Initialization>
+		Memcheck:Cond
+		obj:/usr/lib/libasound.so.2.0.0
+		fun:snd_pcm_hw_params_set_period_size_near
+		obj:/usr/lib/libportaudio.so.2.0.0
+		obj:/usr/lib/libportaudio.so.2.0.0
+		obj:/usr/lib/libportaudio.so.2.0.0
+		fun:PaAlsa_Initialize
+		fun:Pa_Initialize
+		fun:main
+}
+
+{
+	<insert_a_suppression_name_here>
+		Memcheck:Cond
+		obj:/usr/lib/libasound.so.2.0.0
+		obj:/usr/lib/libasound.so.2.0.0
+		obj:/usr/lib/libasound.so.2.0.0
+		fun:snd_pcm_hw_params_set_period_size_near
+		obj:/usr/lib/libportaudio.so.2.0.0
+		obj:/usr/lib/libportaudio.so.2.0.0
+		obj:/usr/lib/libportaudio.so.2.0.0
+		fun:PaAlsa_Initialize
+		fun:Pa_Initialize
+		fun:main
+}

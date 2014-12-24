@@ -57,7 +57,6 @@ static float *cb_get_wptr(CircularBuffer *cb)
 	if (count == cb->size) {
 		/* cb is full, overwrite */
 		cb->start = (cb->start + 1) % cb->size;
-		fprintf(stderr, "OVERWRITE\n");
 	}
 	else {
 		/* counter increment in the callback */
