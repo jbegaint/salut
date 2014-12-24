@@ -165,6 +165,7 @@ static void *udp_thread_routine(void *arg)
 	int rc, sn, sel;
 
 	size_t sz = ctx->cb_in->elt_size;
+	float *buf = calloc(sz, sizeof(float));
 
 	while (*ctx->running) {
 	/* while (1) { */
@@ -190,12 +191,16 @@ static void *udp_thread_routine(void *arg)
 			}
 		}
 		else if (sel > 0) {
+
+			rc = recv_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
+
+			/* FIXME: error on rc */
+			UNUSED(rc);
+
 			/* read received data */
 			wptr = cb_get_wptr(ctx->cb_in);
 
-			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
-			/* FIXME: error on rc */
-			UNUSED(rc);
+			memcpy(wptr, buf, sz * sizeof(*buf));
 
 			/* copy data */
 			cb_increment_count(ctx->cb_in);
@@ -205,11 +210,15 @@ static void *udp_thread_routine(void *arg)
 			rptr = cb_get_rptr(ctx->cb_out);
 			/* FIXME: blocking ? */
 
-			sn = send_msg(s, ctx->peeraddr, rptr, sizeof(float) * sz);
+			memcpy(buf, rptr, sz * sizeof(*buf));
+
+			sn = send_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
 			/* FIXME: error on send */
 			UNUSED(sn);
 		}
 	}
+
+	free(buf);
 
 	return NULL;
 }
