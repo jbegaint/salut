@@ -96,15 +96,6 @@ static int playCallback(const void *input, void *output,
 	if (!*ctx->running)
 		return paComplete;
 
-	/* read received data */
-	wptr = cb_get_wptr(ctx->cb_in);
-
-	recv_msg(*ctx->socket_fd, ctx->peeraddr, wptr, sizeof(float) * ctx->cb_in->elt_size);
-	/* FIXME: error on rc */
-
-	/* all done */
-	cb_increment_count(ctx->cb_in);
-
 	/* get pointer to readable circbuf data */
 	rptr = cb_get_rptr(ctx->cb_in);
 
@@ -138,10 +129,10 @@ static int recordCallback(const void *input, void *output,
 		return paComplete;
 
 	/* DEBUG */
-	int vin, vout;
-	sem_getvalue(&ctx->cb_in->sem, &vin);
-	sem_getvalue(&ctx->cb_out->sem, &vout);
-	fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
+	/* int vin, vout; */
+	/* sem_getvalue(&ctx->cb_in->sem, &vin); */
+	/* sem_getvalue(&ctx->cb_out->sem, &vout); */
+	/* fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout); */
 
 	/* get pointer to writable circbuf data */
 	wptr = cb_get_wptr(ctx->cb_out);
@@ -188,8 +179,8 @@ static void *udp_thread_routine(void *arg)
 		FD_SET(s, &fd);
 
 		struct timeval tv;
-		tv.tv_sec = 0;
-		tv.tv_usec = 100;
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
 
 		sel = select(s + 1, &fd, NULL, NULL, &tv);
 
@@ -199,10 +190,18 @@ static void *udp_thread_routine(void *arg)
 			}
 		}
 		else if (sel > 0) {
-			/* read */
+			/* read received data */
+			wptr = cb_get_wptr(ctx->cb_in);
+
+			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
+			/* FIXME: error on rc */
+			UNUSED(rc);
+
+			/* all data */
+			cb_increment_count(ctx->cb_in);
 		}
 		else {
-			/* send */
+			/* send ? */
 		}
 	}
 
