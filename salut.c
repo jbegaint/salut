@@ -190,21 +190,21 @@ static void *udp_thread_routine(void *arg)
 		}
 
 		/* send data */
-		/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
-		/* 	if (errno == EAGAIN) { */
-		/* 		/1* nope *1/ */
-		/* 		/1* continue *1/ */
-		/* 	} */
-		/* 	else { */
-		/* 		errno_die(); */
-		/* 	} */
-		/* } */
-		/* else { */
+		if (sem_trywait(&ctx->cb_out->sem) == -1) {
+			if (errno == EAGAIN) {
+				/* nope */
+				/* continue */
+			}
+			else {
+				errno_die();
+			}
+		}
+		else {
 			rptr = cb_get_rptr(ctx->cb_out);
 
 			/* TODO: LPC */
 			send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
-		/* } */
+		}
 
 		/* DEBUG */
 		int vin, vout;
