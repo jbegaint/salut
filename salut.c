@@ -130,7 +130,7 @@ static int recordCallback(const void *input, void *output,
 
 	/* DEBUG */
 	int vin, vout;
-	sem_getvalue(&ctx->cb_out->sem, &vin);
+	sem_getvalue(&ctx->cb_in->sem, &vin);
 	sem_getvalue(&ctx->cb_out->sem, &vout);
 	fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
 
@@ -155,11 +155,11 @@ static int recordCallback(const void *input, void *output,
 	/* all done */
 	cb_increment_count(ctx->cb_out);
 
-	/* send data */
-	rptr = cb_get_rptr(ctx->cb_out);
-	/* FIXME: blocking ? */
+	/* /1* send data *1/ */
+	/* rptr = cb_get_rptr(ctx->cb_out); */
+	/* /1* FIXME: LPC ? *1/ */
 
-	send_msg(*ctx->socket_fd, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+	/* send_msg(*ctx->socket_fd, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size); */
 
 	return paContinue;
 }
@@ -201,6 +201,15 @@ static void *udp_thread_routine(void *arg)
 			cb_increment_count(ctx->cb_in);
 		}
 		else {
+			/* send data */
+			int value;
+			sem_getvalue(&ctx->cb_out->sem, &value);
+			if (value == 0)
+				continue;
+			rptr = cb_get_rptr(ctx->cb_out);
+			/* FIXME: LPC ? */
+
+			send_msg(*ctx->socket_fd, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
 		}
 	}
 
