@@ -205,7 +205,7 @@ static void *udp_thread_routine(void *arg)
 			rptr = cb_get_rptr(ctx->cb_out);
 			/* FIXME: blocking ? */
 
-			sn = send_msg(s, ctx->myaddr, rptr, sizeof(float) * sz);
+			sn = send_msg(s, ctx->peeraddr, rptr, sizeof(float) * sz);
 			/* FIXME: error on send */
 			UNUSED(sn);
 		}
