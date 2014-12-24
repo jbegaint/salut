@@ -175,8 +175,8 @@ static void *udp_thread_routine(void *arg)
 		FD_SET(s, &fd);
 
 		struct timeval tv;
-		tv.tv_sec = 0;
-		tv.tv_usec = 10;
+		tv.tv_sec = 1;
+		tv.tv_usec = 10000;
 
 		sel = select(s + 1, &fd, NULL, NULL, &tv);
 
