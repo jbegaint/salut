@@ -188,15 +188,11 @@ static void *udp_thread_routine(void *arg)
 		}
 		else if (sel > 0) {
 			/* read received data */
-			/* wptr = cb_get_wptr(ctx->cb_in); */
+			wptr = cb_get_wptr(ctx->cb_in);
 
-			/* rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz); */
-			rc = recv_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
+			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
 			/* FIXME: error on rc */
 			UNUSED(rc);
-
-			wptr = cb_get_wptr(ctx->cb_in);
-			memcpy(wptr, buf, sz * sizeof(float));
 
 			/* all data */
 			cb_increment_count(ctx->cb_in);
