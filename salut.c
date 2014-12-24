@@ -203,14 +203,14 @@ static void *udp_thread_routine(void *arg)
 		}
 		else {
 			/* send data */
-			if (sem_trywait(&ctx->cb_out->sem) == -1) {
-				if (errno == EAGAIN) {
-					continue;
-				}
-				else {
-					errno_die();
-				}
-			}
+			/* if (sem_trywait(&ctx->cb_out->sem) == -1) { */
+			/* 	if (errno == EAGAIN) { */
+			/* 		continue; */
+			/* 	} */
+			/* 	else { */
+			/* 		errno_die(); */
+			/* 	} */
+			/* } */
 			rptr = cb_get_rptr(ctx->cb_out);
 			/* FIXME:  LPC ? */
 
