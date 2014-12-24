@@ -176,7 +176,8 @@ static void *udp_thread_routine(void *arg)
 
 		struct timeval tv;
 		tv.tv_sec = 1;
-		tv.tv_usec = 10000;
+		/* tv.tv_usec = 10000; */
+		tv.tv_usec = 0;
 
 		sel = select(s + 1, &fd, NULL, NULL, &tv);
 
@@ -204,7 +205,6 @@ static void *udp_thread_routine(void *arg)
 			/* send data */
 			if (sem_trywait(&ctx->cb_out->sem) == -1) {
 				if (errno == EAGAIN) {
-					fprintf(stderr, "EAGAIN\n");
 					continue;
 				}
 				else {
