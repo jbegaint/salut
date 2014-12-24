@@ -173,14 +173,16 @@ static void *udp_thread_routine(void *arg)
 
 	size_t sz = ctx->cb_in->elt_size;
 
+	float *buf = calloc(sz, sizeof(*buf));
+
 	while (*ctx->running) {
 		fd_set fd;
 		FD_ZERO(&fd);
 		FD_SET(s, &fd);
 
 		struct timeval tv;
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
 
 		sel = select(s + 1, &fd, NULL, NULL, &tv);
 
@@ -191,11 +193,15 @@ static void *udp_thread_routine(void *arg)
 		}
 		else if (sel > 0) {
 			/* read received data */
-			wptr = cb_get_wptr(ctx->cb_in);
+			/* wptr = cb_get_wptr(ctx->cb_in); */
 
-			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
+			/* rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz); */
+			rc = recv_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
 			/* FIXME: error on rc */
 			UNUSED(rc);
+
+			wptr = cb_get_wptr(ctx->cb_in);
+			memcpy(wptr, buf, sz * sizeof(float));
 
 			/* all data */
 			cb_increment_count(ctx->cb_in);
@@ -204,6 +210,8 @@ static void *udp_thread_routine(void *arg)
 			/* send ? */
 		}
 	}
+
+	free(buf);
 
 	return NULL;
 }
