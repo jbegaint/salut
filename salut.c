@@ -129,9 +129,10 @@ static int recordCallback(const void *input, void *output,
 		return paComplete;
 
 	/* DEBUG */
-	/* int value; */
-	/* sem_getvalue(&ctx->cb_out->sem, &value); */
-	/* fprintf(stderr, "\rSem value: [%d]", value); */
+	int vin, vout;
+	sem_getvalue(&ctx->cb_out->sem, &vin);
+	sem_getvalue(&ctx->cb_out->sem, &vout);
+	fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
 
 	/* get pointer to writable circbuf data */
 	wptr = cb_get_wptr(ctx->cb_out);
@@ -154,6 +155,12 @@ static int recordCallback(const void *input, void *output,
 	/* all done */
 	cb_increment_count(ctx->cb_out);
 
+	/* send data */
+	rptr = cb_get_rptr(ctx->cb_out);
+	/* FIXME: blocking ? */
+
+	send_msg(*ctx->socket_fd, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+
 	return paContinue;
 }
 
@@ -165,16 +172,8 @@ static void *udp_thread_routine(void *arg)
 	int rc, sn, sel;
 
 	size_t sz = ctx->cb_in->elt_size;
-	float *buf = calloc(sz, sizeof(float));
 
 	while (*ctx->running) {
-	/* while (1) { */
-
-	/* 	pthread_mutex_lock(&lock); */
-	/* 	if (!*ctx->running) */
-	/* 		return NULL; */
-	/* 	pthread_mutex_unlock(&lock); */
-
 		fd_set fd;
 		FD_ZERO(&fd);
 		FD_SET(s, &fd);
@@ -191,34 +190,19 @@ static void *udp_thread_routine(void *arg)
 			}
 		}
 		else if (sel > 0) {
-
-			rc = recv_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
-
-			/* FIXME: error on rc */
-			UNUSED(rc);
-
 			/* read received data */
 			wptr = cb_get_wptr(ctx->cb_in);
 
-			memcpy(wptr, buf, sz * sizeof(*buf));
+			rc = recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
+			/* FIXME: error on rc */
+			UNUSED(rc);
 
 			/* copy data */
 			cb_increment_count(ctx->cb_in);
 		}
 		else {
-			/* send data */
-			rptr = cb_get_rptr(ctx->cb_out);
-			/* FIXME: blocking ? */
-
-			memcpy(buf, rptr, sz * sizeof(*buf));
-
-			sn = send_msg(s, ctx->peeraddr, buf, sizeof(float) * sz);
-			/* FIXME: error on send */
-			UNUSED(sn);
 		}
 	}
-
-	free(buf);
 
 	return NULL;
 }
