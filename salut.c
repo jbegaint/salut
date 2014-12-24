@@ -155,12 +155,6 @@ static int recordCallback(const void *input, void *output,
 	/* all done */
 	cb_increment_count(ctx->cb_out);
 
-	/* send data */
-	rptr = cb_get_rptr(ctx->cb_out);
-	/* FIXME:  LPC ? */
-
-	send_msg(*ctx->socket_fd, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
-
 	return paContinue;
 }
 
@@ -181,8 +175,8 @@ static void *udp_thread_routine(void *arg)
 		FD_SET(s, &fd);
 
 		struct timeval tv;
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
+		tv.tv_sec = 0;
+		tv.tv_usec = 10000;
 
 		sel = select(s + 1, &fd, NULL, NULL, &tv);
 
@@ -207,7 +201,19 @@ static void *udp_thread_routine(void *arg)
 			cb_increment_count(ctx->cb_in);
 		}
 		else {
-			/* send ? */
+			/* send data */
+			if (sem_trywait(&ctx->cb_out->sem) == -1) {
+				if (errno == EAGAIN) {
+					continue;
+				}
+				else {
+					errno_die();
+				}
+			}
+			rptr = cb_get_rptr(ctx->cb_out);
+			/* FIXME:  LPC ? */
+
+			send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
 		}
 	}
 
