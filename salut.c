@@ -128,12 +128,6 @@ static int recordCallback(const void *input, void *output,
 	if (!*ctx->running)
 		return paComplete;
 
-	/* DEBUG */
-	int vin, vout;
-	sem_getvalue(&ctx->cb_in->sem, &vin);
-	sem_getvalue(&ctx->cb_out->sem, &vout);
-	fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
-
 	/* get pointer to writable circbuf data */
 	wptr = cb_get_wptr(ctx->cb_out);
 
@@ -212,6 +206,13 @@ static void *udp_thread_routine(void *arg)
 		/* FIXME:  LPC ? */
 
 		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * ctx->cb_out->elt_size);
+
+		/* DEBUG */
+		int vin, vout;
+		sem_getvalue(&ctx->cb_in->sem, &vin);
+		sem_getvalue(&ctx->cb_out->sem, &vout);
+		fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
+
 	}
 
 	free(buf);
