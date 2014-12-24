@@ -26,20 +26,9 @@ typedef struct {
 
 static int running = 1;
 
-static void die(const char *s, ...)
-{
-	va_list err;
-
-	va_start(err, s);
-	vfprintf(stderr, s, err);
-	va_end(err);
-
-	exit(EXIT_FAILURE);
-}
-
 static void sigint_handler(int signum)
 {
-	(void) (signum);
+	UNUSED(signum);
 
 	running = 0;
 	fprintf(stderr, "Exiting...\n");
@@ -57,10 +46,10 @@ static int playCallback(const void *input, void *output,
 
 	unsigned long i;
 
-	(void) (input);
-	(void) (status_flags);
-	(void) (timeInfo);
-	(void) (user_data);
+	UNUSED(input);
+	UNUSED(status_flags);
+	UNUSED(timeInfo);
+	UNUSED(user_data);
 
 	if (!*ctx->running)
 		return paComplete;
@@ -89,10 +78,10 @@ static int recordCallback(const void *input, void *output,
 
 	unsigned long i;
 
-	(void) (output);
-	(void) (status_flags);
-	(void) (timeInfo);
-	(void) (user_data);
+	UNUSED(output);
+	UNUSED(status_flags);
+	UNUSED(timeInfo);
+	UNUSED(user_data);
 
 	if (!*ctx->running)
 		return paComplete;

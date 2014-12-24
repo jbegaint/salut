@@ -44,17 +44,23 @@ float *cb_get_rptr(CircularBuffer *cb)
 
 float *cb_get_wptr(CircularBuffer *cb)
 {
-	int count;
-	sem_getvalue(&cb->sem, &count);
-	int end = (cb->start + count) % cb->size;
+	int count, end;
+
+	if (sem_getvalue(&cb->sem, &count) == -1)
+		errno_die();
+
+	/* compute buffer end */
+	end = (cb->start + count) % cb->size;
 
 	if (count == cb->size) {
 		/* cb is full, overwrite */
 		cb->start = (cb->start + 1) % cb->size;
 	}
-	else {
-		/* counter increment in the callback */
-	}
+
+	/*
+	 * Counter increment is called in the callback, once all the data has been
+	 * written to the buffer.
+	 */
 
 	return  &cb->data[end * cb->elt_size];
 }
