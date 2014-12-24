@@ -267,9 +267,8 @@ int main(int argc, char **argv)
 		/* client mode */
 		fprintf(stderr, "Client mode...\n");
 
-		/* FIXME: USE ARGV */
-		UNUSED(argv);
-		char *host_name = "127.0.0.1";
+		/* FIXME: TEST ARGV */
+		char *host_name = argv[1];
 		struct hostent *hp;
 		hp = gethostbyname(host_name);
 
