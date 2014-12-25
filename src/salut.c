@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <portaudio.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
@@ -14,7 +15,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <portaudio.h>
 
 #include "circbuf.h"
 #include "udp.h"
@@ -171,8 +171,9 @@ static void *send_thread_routine(void *arg)
 		/* send data */
 		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
-		/* TODO: LPC */
-		send_msg(s, ctx->peeraddr, rptr, sz);
+		/* TODO: LPC encoding */
+		if (send(s, rptr, sz, 0) == -1)
+			errno_die();
 	}
 
 	return NULL;
@@ -185,8 +186,6 @@ static void *read_thread_routine(void *arg)
 	int s = *ctx->socket_fd;
 	int sel;
 	size_t sz = ctx->cb_in->elt_size;
-
-	/* char *buf = calloc(sz, sizeof(char)); */
 
 	while (*ctx->running) {
 		fd_set fd;
@@ -208,7 +207,10 @@ static void *read_thread_routine(void *arg)
 			/* read received data */
 			wptr = (float *) cb_get_wptr(ctx->cb_in);
 
-			recv_msg(s, ctx->peeraddr, wptr, sz);
+			if (recv(s, wptr, sz, 0) == -1)
+				errno_die();
+
+			/* TODO: lpc decoding */
 
 			/* all done */
 			cb_increment_count(ctx->cb_in);
@@ -233,9 +235,11 @@ int main(int argc, char **argv)
 	Context *ctx;
 	pthread_t read_thread, send_thread;
 
-	int socket_fd;
+	int rc, socket_fd;
 	struct sockaddr_in myaddr;
 	struct sockaddr_in peeraddr;
+	struct timeval tv;
+	socklen_t socklen = sizeof(struct sockaddr_in);
 
 	/* signal catching */
 	signal(SIGINT, sigint_handler);
@@ -261,12 +265,28 @@ int main(int argc, char **argv)
 	if (bind(socket_fd, (struct sockaddr *) &myaddr, sizeof(myaddr)) < 0)
 		errno_die();
 
+	tv.tv_sec = 5;
+	tv.tv_usec = 0;
+
+	/* set socket timeout option */
+	if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+		errno_die();
+	}
+
+	/* initial handshake */
 	if (argc == 1) {
 		/* server mode */
 		fprintf(stderr, "Server mode...\n");
 
 		/* waiting for a peer */
-		recv_msg(socket_fd, &peeraddr, buffer, buf_len);
+		rc = recv_msg(socket_fd, &peeraddr, buffer, MAX_LEN);
+
+		if (rc == -1) {
+			fprintf(stderr, "No response from peer, exiting.\n");
+			close(socket_fd);
+			exit(EXIT_FAILURE);
+		}
+
 		printf("[MSG FROM CLIENT]: %s\n", buffer);
 
 		send_msg(socket_fd, &peeraddr, buffer, strlen(buffer) + 1);
@@ -281,35 +301,28 @@ int main(int argc, char **argv)
 		hp = gethostbyname(host_name);
 
 		init_peer_addr(&peeraddr, INADDR_ANY);
+
 		/* copy peer addr */
 		memcpy(&peeraddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
 		/* sending hello message */
 		send_msg(socket_fd, &peeraddr, msg, strlen(msg) + 1);
 
-		socklen_t socklen = sizeof(struct sockaddr_in);
-		int rc;
-		struct timeval tv;
-		tv.tv_sec = 1;
-		tv.tv_usec = 0;
-
-		/* set socket timeout option */
-		if (setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-			errno_die();
-		}
-
 		/* waiting for the peer to respond */
 		rc = recvfrom(socket_fd, buffer, buf_len, 0, (struct sockaddr *) &peeraddr, &socklen);
+
 		if (rc == -1) {
-			if (errno == EAGAIN) {
-				fprintf(stderr, "No response from peer, exiting.\n");
-				close(socket_fd);
-				exit(EXIT_FAILURE);
-			}
-			errno_die();
+			fprintf(stderr, "No response from peer, exiting.\n");
+			close(socket_fd);
+			exit(EXIT_FAILURE);
 		}
+
 		printf("[MSG FROM PEER]: %s\n", buffer);
+
 	}
+	/* connecting to peer */
+	if (connect(socket_fd, (struct sockaddr *) &peeraddr, socklen) == -1)
+		errno_die();
 
 	/* init context */
 	ctx = ctx_init(&running, 20);
