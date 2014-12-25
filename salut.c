@@ -46,13 +46,16 @@ static Context *ctx_init(int *running_ptr, int n_elt)
 {
 	Context *ctx = calloc(1, sizeof(*ctx));
 	CircularBuffer *cb_in, *cb_out;
+	size_t sz;
 
 	/*
 	 * Init circular buffers. We use an n_elt elements array, each element being
 	 * a row of 256 samples.
 	 */
-	cb_in = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE * sizeof(float));
-	cb_out = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE * sizeof(float));
+	sz = NUM_CHANNELS * BUF_SIZE * sizeof(float);
+
+	cb_in = cb_init(n_elt, sz);
+	cb_out = cb_init(n_elt, sz);
 
 	/* init context */
 	ctx->running = running_ptr;
