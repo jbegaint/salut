@@ -47,9 +47,12 @@ static Context *ctx_init(int *running_ptr, int n_elt)
 	Context *ctx = calloc(1, sizeof(*ctx));
 	CircularBuffer *cb_in, *cb_out;
 
-	/* init circular buffers */
-	cb_in = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE);
-	cb_out = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE);
+	/* 
+	 * Init circular buffers. We use an n_elt elements array, each element being
+	 * a row of 256 samples.
+	 */
+	cb_in = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE * sizeof(float));
+	cb_out = cb_init(n_elt, NUM_CHANNELS * BUF_SIZE * sizeof(float));
 
 	/* init context */
 	ctx->running = running_ptr;
@@ -99,7 +102,7 @@ static int playCallback(const void *input, void *output,
 		return paComplete;
 
 	/* get pointer to readable circbuf data */
-	rptr = cb_get_rptr(ctx->cb_in);
+	rptr = (float *) cb_get_rptr(ctx->cb_in);
 
 	for (i = 0; i < frames_count; ++i) {
 		/* left and right */
@@ -131,7 +134,7 @@ static int recordCallback(const void *input, void *output,
 		return paComplete;
 
 	/* get pointer to writable circbuf data */
-	wptr = cb_get_wptr(ctx->cb_out);
+	wptr = (float *) cb_get_wptr(ctx->cb_out);
 
 	if (!input) {
 		for (i = 0; i < frames_count; ++i) {
@@ -163,10 +166,10 @@ static void *send_thread_routine(void *arg)
 
 	while (*ctx->running) {
 		/* send data */
-		rptr = cb_get_rptr(ctx->cb_out);
+		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
 		/* TODO: LPC */
-		send_msg(s, ctx->peeraddr, rptr, sizeof(float) * sz);
+		send_msg(s, ctx->peeraddr, rptr, sz);
 	}
 
 	return NULL;
@@ -179,6 +182,8 @@ static void *read_thread_routine(void *arg)
 	int s = *ctx->socket_fd;
 	int sel;
 	size_t sz = ctx->cb_in->elt_size;
+
+	/* char *buf = calloc(sz, sizeof(char)); */
 
 	while (*ctx->running) {
 		fd_set fd;
@@ -198,9 +203,9 @@ static void *read_thread_routine(void *arg)
 
 		if (FD_ISSET(s, &fd)) {
 			/* read received data */
-			wptr = cb_get_wptr(ctx->cb_in);
+			wptr = (float *) cb_get_wptr(ctx->cb_in);
 
-			recv_msg(s, ctx->peeraddr, wptr, sizeof(float) * sz);
+			recv_msg(s, ctx->peeraddr, wptr, sz);
 
 			/* all done */
 			cb_increment_count(ctx->cb_in);

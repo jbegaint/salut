@@ -16,7 +16,7 @@ CircularBuffer *cb_init(int size, int elt_size)
 	cb->start = 0;
 
 	/* allocate memory */
-	cb->data = calloc(cb->elt_size * size, sizeof(float));
+	cb->data = calloc(cb->elt_size * size, sizeof(char));
 
 	/* init the semaphore */
 	if (sem_init(&cb->sem, 0, 10) == -1)
@@ -34,7 +34,7 @@ void cb_free(CircularBuffer *cb)
 	free(cb->data);
 }
 
-float *cb_get_rptr(CircularBuffer *cb)
+char *cb_get_rptr(CircularBuffer *cb)
 {
 	if (sem_wait(&cb->sem) == -1)
 		errno_die();
@@ -44,7 +44,7 @@ float *cb_get_rptr(CircularBuffer *cb)
 	return &cb->data[cb->start * cb->elt_size];
 }
 
-float *cb_get_wptr(CircularBuffer *cb)
+char *cb_get_wptr(CircularBuffer *cb)
 {
 	int count, end;
 
@@ -64,7 +64,7 @@ float *cb_get_wptr(CircularBuffer *cb)
 	 * written to the buffer.
 	 */
 
-	return  &cb->data[end * cb->elt_size];
+	return &cb->data[end * cb->elt_size];
 }
 
 void cb_increment_count(CircularBuffer *cb)
