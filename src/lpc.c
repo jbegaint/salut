@@ -21,10 +21,10 @@ void hanning(const float *input, const size_t len, float *output)
 
 float get_pitch_by_amdf(const float *input, const size_t len)
 {
-	/* 
+	/*
 	 * Min and max pitch *in sample*. We use 50Hz and 300Hz as arbitrary pitch
 	 * limits.
-	 */ 
+	 */
 	const unsigned int min_pitch = SAMPLE_RATE / 300;
 	const unsigned int max_pitch = SAMPLE_RATE / 50;
 	float pitch = 0;
@@ -158,12 +158,8 @@ LpcData *lpc_encode(const float *input, const size_t input_len)
 	/* 	if (lpc_chunk->pitch == 0) */
 	/* 		continue; */
 
-	/* 	/1* apodization *1/ */
-	/* 	chunk_ptr = (float *) &input[lpc_data->chunk_size * i]; */
-	/* 	hanning(chunk_ptr, lpc_data->chunk_size, chunk_apodized); */
-
+		/* apodization */
 		/* autocorr */
-
 		/* discard mirror parts */
 		/* findpeaks */
 		/* extract pitch (2nd max) */
