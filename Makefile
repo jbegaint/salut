@@ -1,7 +1,7 @@
-CFLAGS = -std=gnu99 -Wall -Wextra -Wshadow -pedantic -g
+CFLAGS = -std=gnu99 -Wall -Wextra -Wshadow -pedantic -Iinclude -g
 LDFLAGS = -lportaudio -lpthread
 
-SRC = $(wildcard *.c)
+SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)
 
 BIN = salut
