@@ -3,11 +3,9 @@
 
 /* #define SAMPLE_RATE 44100 */
 #define SAMPLE_RATE 22050
-#define NUM_CHANNELS 2
-
-/* sample type */
-#define stype float
 #define SAMPLE_SILENCE 0.0f
+
+#define NUM_CHANNELS 2
 
 #define BUF_SIZE 256
 

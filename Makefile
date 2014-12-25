@@ -1,5 +1,5 @@
 CFLAGS = -std=gnu99 -Wall -Wextra -Wshadow -pedantic -Iinclude -g
-LDFLAGS = -lportaudio -lpthread
+LDFLAGS = -lportaudio -lpthread -lm
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)

@@ -17,15 +17,9 @@
 #include <unistd.h>
 
 #include "circbuf.h"
+#include "general.h"
 #include "udp.h"
 #include "utils.h"
-
-/* #define SAMPLE_RATE 44100 */
-#define SAMPLE_RATE 22050
-#define NUM_CHANNELS 2
-#define SAMPLE_SILENCE 0.0f
-
-#define BUF_SIZE 256
 
 #define MAX_LEN 256
 
