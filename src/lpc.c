@@ -48,7 +48,7 @@ float get_pitch_by_amdf(float *input, const size_t len)
 
 	/* determine optimal pitch */
 	for (i = 0; i < max_pitch - min_pitch; ++i) {
-		if (pitch < d[i]) {
+		if (max_d < d[i]) {
 			max_d = d[i];
 			pitch = i;
 		}
@@ -128,18 +128,23 @@ LpcChunk lpc_encode(float *input)
 void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
 	/* compute excitation */
+	unsigned int i;
 
 	if (lpc_chunk->pitch > 0) {
 		/* voiced sound, use a pulse impulsion train */
-
+		for (i = 0; i < CHUNK_SIZE; ++i) {
+			if ((i % (int) lpc_chunk->pitch) == 0) {
+				output[i] = sqrt(lpc_chunk->pitch);
+			}
+		}
 	}
 	else {
 		/* non voiced sound, use a white noise */
 	}
 
-	printf("chunk pitch: %f\n", lpc_chunk->pitch);
+	/* printf("chunk pitch: %f\n", lpc_chunk->pitch); */
 
 	/* lpc decode */
-	vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, output,
-			CHUNK_SIZE);
+	/* vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, output, */
+	/* 		CHUNK_SIZE); */
 }
