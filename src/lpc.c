@@ -153,8 +153,11 @@ LpcData *lpc_encode(const float *input, const size_t input_len)
 	for (i = 0; i < lpc_data->n_chunks; ++i) {
 		lpc_chunk = &lpc_data->chunks[i];
 
-		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
+		/* skip step for non-voiced sounds */
+		if (lpc_chunk->pitch == 0)
+			continue;
 
+		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
 		lpc_chunk->pitch = get_pitch_by_amdf(chunk_ptr, lpc_data->chunk_size);
 	}
 
