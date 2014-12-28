@@ -18,6 +18,7 @@
 
 #include "circbuf.h"
 #include "general.h"
+#include "lpc.h"
 #include "udp.h"
 #include "utils.h"
 
@@ -160,13 +161,18 @@ static void *send_thread_routine(void *arg)
 	float *rptr = NULL;
 	int s = *ctx->socket_fd;
 	size_t sz = ctx->cb_out->elt_size;
+	size_t out_sz;
 
 	while (*ctx->running) {
 		/* send data */
 		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
 		/* TODO: LPC encoding */
-		if (send(s, rptr, sz, 0) == -1)
+		void *out = lpc_encode(rptr, sz, &out_sz);
+
+		/* if (send(s, rptr, sz, 0) == -1) */
+		/* 	errno_die(); */
+		if (send(s, out, out_sz, 0) == -1)
 			errno_die();
 	}
 

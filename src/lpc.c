@@ -29,21 +29,22 @@ float get_pitch_by_amdf(float *input, const size_t len)
 	const unsigned int min_pitch = SAMPLE_RATE / 300;
 	const unsigned int max_pitch = SAMPLE_RATE / 50;
 	float pitch = 0;
-
 	unsigned int i, j;
+	float *d = NULL;
 
-	float *d = calloc(max_pitch - min_pitch, sizeof(*d));
+	d = calloc(max_pitch - min_pitch, sizeof(*d));
 	handle_alloc_error(d);
 
 	/* compute the difference signals */
 	for (i = min_pitch; i < max_pitch; ++i) {
 
 		for (j = i; j < len; ++j) {
-			d[i] += fabs(input[i] - input[i - j]);
+			/* d[i] += fabs(input[i] - input[i - j]); */
+			d[i - min_pitch] += fabs(input[i] - input[j - i]);
 		}
 
 		/* mean */
-		d[i] /= len - i + 1;
+		d[i - min_pitch] /= len - i + 1;
 	}
 
 	/* determine optimal pitch */
@@ -96,7 +97,7 @@ void lpc_detect_voiced(float *input, LpcData *lpc_data)
 	for (i = 0; i < lpc_data->n_chunks; ++i) {
 
 		/* zero crossing counter */
-		c = 0;
+		c = 1;
 
 		/* TODO: discard chunk if chunk qualifies as (white) noise */
 		for (j = 1; j < lpc_data->chunk_size; ++j) {
@@ -125,7 +126,7 @@ void lpc_detect_voiced(float *input, LpcData *lpc_data)
 	}
 }
 
-LpcData *lpc_encode(float *input, const size_t input_len)
+LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz)
 {
 	LpcChunk *lpc_chunk = NULL;
 	LpcData *lpc_data = NULL;
@@ -162,14 +163,16 @@ LpcData *lpc_encode(float *input, const size_t input_len)
 		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
 
 		/* Compute LPC thx to libvorbis function. TODO: use the error ? */
-		vorbis_lpc_from_data(chunk_ptr, lpc_chunk->coefficients, 
+		vorbis_lpc_from_data(chunk_ptr, lpc_chunk->coefficients,
 				lpc_data->chunk_size, N_COEFFS);
 	}
+
+	*sz = sizeof(lpc_data);
 
 	return lpc_data;
 }
 
-void lpc_decode(LpcData *lpc_data, float *output) 
+void lpc_decode(LpcData *lpc_data, float *output)
 {
 	unsigned int i;
 	LpcChunk *lpc_chunk = NULL;
@@ -191,6 +194,6 @@ void lpc_decode(LpcData *lpc_data, float *output)
 
 		/* lpc decode */
 		vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, out_ptr,
-				lpc_data->chunk_size); 
+				lpc_data->chunk_size);
 	}
 }

@@ -3,7 +3,8 @@
 
 /* FIXME */
 /* apodization window size (in samples, for Fs = 22050Hz) */
-#define WINDOW_SIZE 256
+/* #define WINDOW_SIZE 256 */
+#define WINDOW_SIZE 512
 
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
@@ -27,7 +28,8 @@ typedef struct {
 LpcData *lpc_data_init(const size_t input_len);
 void lpc_data_free(LpcData *lpc_data);
 
-LpcData *lpc_encode(float *input, const size_t input_len);
+LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz);
+void lpc_decode(LpcData *lpc_data, float *output);
 
 void lpc_detect_voiced(float *input, LpcData *lpc_data);
 
