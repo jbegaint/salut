@@ -7,6 +7,7 @@
 
 #define NUM_CHANNELS 2
 
-#define BUF_SIZE 256
+/* #define BUF_SIZE 256 */
+#define BUF_SIZE 512
 
 #endif

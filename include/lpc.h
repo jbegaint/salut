@@ -1,6 +1,8 @@
 #ifndef _LPC_H_
 #define _LPC_H_
 
+#include "general.h"
+
 /* FIXME */
 /* apodization window size (in samples, for Fs = 22050Hz) */
 /* #define WINDOW_SIZE 256 */
@@ -11,6 +13,7 @@
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
  */
+#define FS SAMPLE_RATE
 #define F_THRESHOLD 0.014
 
 #define N_COEFFS 64

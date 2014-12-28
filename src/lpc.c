@@ -53,7 +53,11 @@ float get_pitch_by_amdf(float *input, const size_t len)
 			pitch = d[i];
 	}
 
+	/* free the mallocs */
 	free(d);
+
+	/* convert in hertz (for readability) */
+	pitch *= FS;
 
 	return pitch;
 }
