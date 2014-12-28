@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #include <liquid/liquid.h>
@@ -90,27 +91,30 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 
 LpcChunk lpc_encode(float *input)
 {
-	/* pre emphasis filter */
-	/* TODO */
 	LpcChunk lpc_chunk;
+
+	memset(&lpc_chunk, 0, sizeof(lpc_chunk));
+
+	/* TODO: pre emphasis filter */
 
 	/* detect voiced/ non-voiced sound */
 	lpc_detect_voiced(input, &lpc_chunk);
 
-	/* TODO: use autocorrelation to compute the pitch (?) */
-
-	/* as AMDF is simpler to implement, let's use it for now */
+	/*
+	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
+	 * implement, let's use it for now
+	 */
 
 	/* skip step for non-voiced sounds */
 	if (lpc_chunk.pitch == 1) {
 		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 
-	/* useless for now (TODO ?) */
+	/* prediction error variances, useless for now (TODO ?) */
 	float g[N_COEFFS];
 
 	/* compute lpc */
-	my_liquid_lpc(input, CHUNK_SIZE, N_COEFFS, lpc_chunk.coefficients, g);
+	my_liquid_lpc(input, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
 }
@@ -118,16 +122,12 @@ LpcChunk lpc_encode(float *input)
 void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
 	unsigned int i;
-	float a_lpc[N_COEFFS];
-	float b_lpc[N_COEFFS];
 	float excitation[CHUNK_SIZE];
 
 	float *coeffs = lpc_chunk->coefficients;
 
 	/* compute the excitation */
 	if (lpc_chunk->pitch > 0) {
-		printf("%d\n", lpc_chunk->pitch);
-
 		/* if voiced, generate an impulsion train */
 		excitation[0] = 1;
 		for (i = 1; i < CHUNK_SIZE; ++i) {
@@ -142,14 +142,16 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	}
 
 	/* init filter coefficients */
-	for (i = 0; i < N_COEFFS; ++i) {
-		a_lpc[i] = (i == 0) ? 1 : 0;
-		/* or MINUS ? */
-		b_lpc[i] = (i == 0) ? 0 : coeffs[i];
-	}
+
+	float b_lpc[N_COEFFS];
+	memset(&b_lpc, 0, sizeof(b_lpc));
+	b_lpc[0] = 1;
 
 	/* filter the excitation */
-	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
+	/* liquid dsp: iirfilt_rrrf loopfilter = iirfilt_rrrf_create(b,3,a,3); */
+	/* matlab : filter(1, coeffs, ...), y = filter(b,a,x) */
+
+	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, coeffs, N_COEFFS);
 
 	for (i = 0; i < CHUNK_SIZE; ++i) {
 		iirfilt_rrrf_execute(f, excitation[i], &output[i]);
