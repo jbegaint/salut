@@ -213,7 +213,7 @@ static void *read_thread_routine(void *arg)
 			/* lpc decoding */
 			lpc_decode(&in, wptr);
 
-			/* all done */
+			/* all done, data is written */
 			cb_increment_count(ctx->cb_in);
 		}
 

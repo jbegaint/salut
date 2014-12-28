@@ -105,32 +105,67 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	}
 }
 
+void lpc_pre_emphasis_filter(float *input, float *output)
+{
+	unsigned int i;
+
+	float a[2]= {1.f, 1.f};
+	float b[2] = {1.f, -0.9f};
+
+	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
+
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		iirfilt_rrrf_execute(f, input[i], &output[i]);
+	}
+
+	iirfilt_rrrf_destroy(f);
+}
+
+void lpc_de_emphasis_filter(float *input, float *output)
+{
+	unsigned int i;
+
+	float a[2] = {1.f, -0.9f};
+	float b[2]= {1.f, 1.f};
+
+	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
+
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		iirfilt_rrrf_execute(f, input[i], &output[i]);
+	}
+
+	iirfilt_rrrf_destroy(f);
+}
+
 LpcChunk lpc_encode(float *input)
 {
 	LpcChunk lpc_chunk;
+	float data[CHUNK_SIZE];
 
+	/* zero struct */
 	memset(&lpc_chunk, 0, sizeof(lpc_chunk));
 
-	/* TODO: pre emphasis filter */
+	/* pre emphasis filter */
+	lpc_pre_emphasis_filter(input, data);
 
-	/* detect voiced/ non-voiced sound */
-	lpc_detect_voiced(input, &lpc_chunk);
+	/* detect voiced/non-voiced sound */
+	lpc_detect_voiced(data, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
-	 * implement, let's use it for now
+	 * implement, let's use it for now.
 	 */
 
 	/* skip step for non-voiced sounds */
 	if (lpc_chunk.pitch == 1) {
-		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
+		lpc_chunk.pitch = get_pitch_by_amdf(data, CHUNK_SIZE);
 	}
 
 	/* prediction error variances, useless for now (TODO ?) */
 	float g[N_COEFFS];
 
 	/* compute lpc */
-	my_liquid_lpc(input, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
+	my_liquid_lpc(data, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
 }
@@ -140,17 +175,17 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	unsigned int i;
 	float excitation[CHUNK_SIZE];
 
-	float *coeffs = lpc_chunk->coefficients;
+	const float *coeffs = lpc_chunk->coefficients;
+	const int pitch = lpc_chunk->pitch;
 
 	/* compute the excitation */
-	if (lpc_chunk->pitch > 0) {
+	if (pitch > 0) {
 		/* if voiced, generate an impulsion train */
-		excitation[0] = 1;
-		for (i = 1; i < CHUNK_SIZE; ++i) {
-			excitation[i] = ((i % lpc_chunk->pitch) == 0) ? 1 : 0;
+		for (i = 0; i < CHUNK_SIZE; ++i) {
+			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
 		}
 	}
-	else if (lpc_chunk->pitch == 0) {
+	else if (pitch == 0) {
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			excitation[i] = randnf();
@@ -165,8 +200,9 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	}
 
 	/* init filter coefficients */
-
 	float b_lpc[N_COEFFS];
+	float *a_lpc = (float *) coeffs;
+
 	memset(&b_lpc, 0, sizeof(b_lpc));
 	b_lpc[0] = 1;
 
@@ -174,11 +210,14 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	/* liquid dsp: iirfilt_rrrf loopfilter = iirfilt_rrrf_create(b,3,a,3); */
 	/* matlab : filter(1, coeffs, ...), y = filter(b,a,x) */
 
-	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, coeffs, N_COEFFS);
+	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
 
 	for (i = 0; i < CHUNK_SIZE; ++i) {
 		iirfilt_rrrf_execute(f, excitation[i], &output[i]);
 	}
 
 	iirfilt_rrrf_destroy(f);
+
+	/* de-emphasis filter */
+	lpc_de_emphasis_filter(output, output);
 }
