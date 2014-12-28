@@ -28,7 +28,7 @@ float get_pitch_by_amdf(float *input, const size_t len)
 	 */
 	const unsigned int min_pitch = SAMPLE_RATE / 300;
 	const unsigned int max_pitch = SAMPLE_RATE / 50;
-	float pitch = 0;
+	float pitch = 0, max_d = 0;
 	unsigned int i, j;
 	float *d = NULL;
 
@@ -49,15 +49,17 @@ float get_pitch_by_amdf(float *input, const size_t len)
 
 	/* determine optimal pitch */
 	for (i = 0; i < max_pitch - min_pitch; ++i) {
-		if (pitch < d[i])
-			pitch = d[i];
+		if (pitch < d[i]) {
+			max_d = d[i];
+			pitch = i;
+		}
 	}
+
+	/* corret the offset */
+	pitch += min_pitch;
 
 	/* free the mallocs */
 	free(d);
-
-	/* convert in hertz (for readability) */
-	pitch *= FS;
 
 	return pitch;
 }
