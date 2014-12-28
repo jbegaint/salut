@@ -97,7 +97,7 @@ void lpc_detect_voiced(const float *input, LpcData *lpc_data)
 		/* zero crossing counter */
 		c = 0;
 
-		/* TODO: discard chunk if qualifies as (white) noise */
+		/* TODO: discard chunk if chunk qualifies as (white) noise */
 		for (j = 1; j < lpc_data->chunk_size; ++j) {
 			val1 = input[i * lpc_data->chunk_size + j];
 			val2 = input[i * lpc_data->chunk_size + j + 1];
@@ -109,7 +109,7 @@ void lpc_detect_voiced(const float *input, LpcData *lpc_data)
 		}
 
 		/* TODO: skip these steps by using a threshold directly based on the
-		 * number of zero crossings. */
+		 * number of zero crossings (converted from the max frequency). */
 
 		/* compute period */
 		p = 2 * lpc_data->chunk_size / c;
@@ -138,9 +138,6 @@ LpcData *lpc_encode(const float *input, const size_t input_len)
 	/* float *amdf_res = NULL; */
 	unsigned int i;
 
-	/* amdf_res = calloc(lpc_data->chunk_size, sizeof(float)); */
-	/* handle_alloc_error(chunk_apodized); */
-
 	/* create a struct for the results */
 	lpc_data = lpc_data_init(input_len);
 
@@ -150,20 +147,7 @@ LpcData *lpc_encode(const float *input, const size_t input_len)
 	/* detect voiced/ non-voiced sound */
 	lpc_detect_voiced(input, lpc_data);
 
-	/* use autocorrelation to compute the pitch */
-	/* for (i = 0; i < lpc_data->n_chunks; ++i) { */
-	/* 	lpc_chunk = &lpc_data->chunks[i]; */
-
-	/* 	/1* i.e.: non voiced *1/ */
-	/* 	if (lpc_chunk->pitch == 0) */
-	/* 		continue; */
-
-		/* apodization */
-		/* autocorr */
-		/* discard mirror parts */
-		/* findpeaks */
-		/* extract pitch (2nd max) */
-	/* } */
+	/* TODO: use autocorrelation to compute the pitch (?) */
 
 	/* as AMDF is simpler to implement, let's use it for now */
 	for (i = 0; i < lpc_data->n_chunks; ++i) {
