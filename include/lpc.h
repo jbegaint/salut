@@ -20,12 +20,7 @@ typedef struct {
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;
 
-/* LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz); */
-/* void lpc_decode(LpcData *lpc_data, float *output); */
-
 LpcChunk lpc_encode(float *input);
 void lpc_decode(LpcChunk *lpc_chunk, float *output);
-
-/* void lpc_detect_voiced(float *input, LpcData *lpc_data); */
 
 #endif
