@@ -11,6 +11,17 @@
 
 #define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
 
+void hanning(const float *input, const size_t len, float *output)
+{
+	unsigned int i;
+	float coef;
+
+	for (i = 0; i < len; ++i) {
+		coef = 0.5 - 0.5 * cos(2.f * M_PI * i / len);
+		*output++ = *input++ * coef;
+	}
+}
+
 int get_pitch_by_amdf(float *input, const size_t len)
 {
 	/*
@@ -155,7 +166,7 @@ LpcChunk lpc_encode(float *input)
 
 	/* skip step for non-voiced sounds */
 	if (lpc_chunk.pitch == 1) {
-		lpc_chunk.pitch = get_pitch_by_amdf(data, CHUNK_SIZE);
+		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 	else if (lpc_chunk.pitch == -1) {
 		return lpc_chunk;
@@ -164,12 +175,11 @@ LpcChunk lpc_encode(float *input)
 	/* prediction error variances, useless for now (TODO ?) */
 	float g[N_COEFFS];
 
-	/* compute lpc */
-
 	/* pre emphasis filter */
-	/* lpc_pre_emphasis_filter(input, data); */
-	memcpy(data, input, CHUNK_SIZE * sizeof(float));
+	/* hanning(input, CHUNK_SIZE, data); */
+	lpc_pre_emphasis_filter(input, data);
 
+	/* compute lpc */
 	my_liquid_lpc(data, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
@@ -225,5 +235,5 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	iirfilt_rrrf_destroy(f);
 
 	/* de-emphasis filter */
-	/* lpc_de_emphasis_filter(output, output); */
+	lpc_de_emphasis_filter(output, output);
 }

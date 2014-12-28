@@ -3,11 +3,7 @@
 
 #include "general.h"
 
-/* FIXME */
-/* apodization window size (in samples, for Fs = 22050Hz) */
-/* #define WINDOW_SIZE 512 */
-
-#define CHUNK_SIZE BUF_SIZE
+#define CHUNK_SIZE (NUM_CHANNELS * BUF_SIZE)
 
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.

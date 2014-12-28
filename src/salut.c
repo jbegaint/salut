@@ -45,7 +45,7 @@ static Context *ctx_init(int *running_ptr, int n_elt)
 
 	/*
 	 * Init circular buffers. We use an n_elt elements array, each element being
-	 * a row of 256 samples.
+	 * a row of BUF_SIZE samples (*NUM_CHANNELS).
 	 */
 	sz = NUM_CHANNELS * BUF_SIZE * sizeof(float);
 
