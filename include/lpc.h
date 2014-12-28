@@ -27,9 +27,8 @@ typedef struct {
 LpcData *lpc_data_init(const size_t input_len);
 void lpc_data_free(LpcData *lpc_data);
 
-LpcData *lpc_encode(const float *input, const size_t input_len);
+LpcData *lpc_encode(float *input, const size_t input_len);
 
-void lpc_analysis(LpcChunk *lpc_chunk);
-void lpc_detect_voiced(const float *input, LpcData *lpc_data);
+void lpc_detect_voiced(float *input, LpcData *lpc_data);
 
 #endif

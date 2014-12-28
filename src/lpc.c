@@ -4,22 +4,23 @@
 
 #include "general.h"
 #include "lpc.h"
+#include "vorbis_lpc.h"
 #include "utils.h"
 
 #define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
 
-void hanning(const float *input, const size_t len, float *output)
-{
-	unsigned int i;
-	float coef;
+/* void hanning(const float *input, const size_t len, float *output) */
+/* { */
+/* 	unsigned int i; */
+/* 	float coef; */
 
-	for (i = 0; i < len; ++i) {
-		coef = 0.5 - 0.5 * cos(2 * M_PI * i / len);
-		*output++ = *input++ * coef;
-	}
-}
+/* 	for (i = 0; i < len; ++i) { */
+/* 		coef = 0.5 - 0.5 * cos(2 * M_PI * i / len); */
+/* 		*output++ = *input++ * coef; */
+/* 	} */
+/* } */
 
-float get_pitch_by_amdf(const float *input, const size_t len)
+float get_pitch_by_amdf(float *input, const size_t len)
 {
 	/*
 	 * Min and max pitch *in sample*. We use 50Hz and 300Hz as arbitrary pitch
@@ -86,7 +87,7 @@ void lpc_data_free(LpcData *lpc_data)
 	free(lpc_data);
 }
 
-void lpc_detect_voiced(const float *input, LpcData *lpc_data)
+void lpc_detect_voiced(float *input, LpcData *lpc_data)
 {
 	unsigned int i, j, c;
 	float val1, val2, p, f;
@@ -124,18 +125,12 @@ void lpc_detect_voiced(const float *input, LpcData *lpc_data)
 	}
 }
 
-void lpc_analysis(LpcChunk *lpc_chunk)
-{
-	UNUSED(lpc_chunk);
-}
-
-LpcData *lpc_encode(const float *input, const size_t input_len)
+LpcData *lpc_encode(float *input, const size_t input_len)
 {
 	LpcChunk *lpc_chunk = NULL;
 	LpcData *lpc_data = NULL;
 
 	float *chunk_ptr = NULL;
-	/* float *amdf_res = NULL; */
 	unsigned int i;
 
 	/* create a struct for the results */
@@ -164,10 +159,38 @@ LpcData *lpc_encode(const float *input, const size_t input_len)
 	/* compute lpc coefficients */
 	for (i = 0; i < lpc_data->n_chunks; ++i) {
 		lpc_chunk = &lpc_data->chunks[i];
+		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
 
-		/* compute lpc */
-		lpc_analysis(lpc_chunk);
+		/* Compute LPC thx to libvorbis function. TODO: use the error ? */
+		vorbis_lpc_from_data(chunk_ptr, lpc_chunk->coefficients, 
+				lpc_data->chunk_size, N_COEFFS);
 	}
 
 	return lpc_data;
+}
+
+void lpc_decode(LpcData *lpc_data, float *output) 
+{
+	unsigned int i;
+	LpcChunk *lpc_chunk = NULL;
+
+	float *out_ptr;
+
+	for (i = 0; i < lpc_data->n_chunks; ++i) {
+		/* compute excitation */
+
+		if (lpc_chunk->pitch > 0) {
+			/* voiced sound, use a pulse impulsion train */
+
+		}
+		else {
+			/* non voiced sound, use a white noise */
+		}
+
+		out_ptr = &output[lpc_data->chunk_size * i];
+
+		/* lpc decode */
+		vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, out_ptr,
+				lpc_data->chunk_size); 
+	}
 }
