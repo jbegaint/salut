@@ -218,10 +218,10 @@ static void *read_thread_routine(void *arg)
 		}
 
 		/* DEBUG */
-		int vin, vout;
-		sem_getvalue(&ctx->cb_in->sem, &vin);
-		sem_getvalue(&ctx->cb_out->sem, &vout);
-		fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout);
+		/* int vin, vout; */
+		/* sem_getvalue(&ctx->cb_in->sem, &vin); */
+		/* sem_getvalue(&ctx->cb_out->sem, &vout); */
+		/* fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout); */
 	}
 
 	return NULL;

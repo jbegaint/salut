@@ -128,23 +128,68 @@ LpcChunk lpc_encode(float *input)
 void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
 	/* compute excitation */
-	unsigned int i;
+	unsigned int i, j;
+
+	float *excitation = calloc(CHUNK_SIZE, sizeof(*excitation));
 
 	if (lpc_chunk->pitch > 0) {
 		/* voiced sound, use a pulse impulsion train */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			if ((i % (int) lpc_chunk->pitch) == 0) {
-				output[i] = sqrt(lpc_chunk->pitch);
+				excitation[i] = sqrt(lpc_chunk->pitch);
 			}
 		}
 	}
 	else {
 		/* non voiced sound, use a white noise */
+		/* FIXME */
 	}
 
-	/* printf("chunk pitch: %f\n", lpc_chunk->pitch); */
+	/* filter */
+	float *a = lpc_chunk->coefficients;
+	float b = 1;
+	float *y = output;
+	float *x = excitation;
+
+	/* a[1]y[n] = b[1]x[n]+b[2]x[n-1]+...+b[N]x[n-N+1]-a[2]y[n-1]-...-a[N]y[n-N+1]; */
+
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		y[i] = 0;
+
+		for (j = 0; j < N_COEFFS && j < i; ++j) {
+			y[i] = y[i] + b * x[i - j];
+		}
+		for (j = 1; j < N_COEFFS && j < i; ++j) {
+			y[i] = y[i] - a[j] * y[i - j];
+		}
+
+		y[i] = y[i] / a[0];
+	}
+
+	/* y[0] = 1 * x[0]; */
+	/* for (i = 1; i < N_COEFFS; ++i) { */
+	/* 	y[i] = 0; */
+	/* 	for (j = 0; j < i + 1; ++j) { */
+	/* 		y[i] = y[i] + b * x[i - j]; */
+	/* 	} */
+	/* 	for (j = 0; j < i; ++j) { */
+	/* 		y[i] = y[i] - a[j + 1] * y[i - j + 1]; */
+	/* 	} */
+	/* } */
+
+	/* for (i = N_COEFFS; i < CHUNK_SIZE; ++i) { */
+	/* 	y[i] = 0; */
+	/* 	for (j = 0; j < i + 1; ++j) { */
+	/* 		y[i] = y[i] + b * x[i - j]; */
+	/* 	} */
+	/* 	for (j = 0; j < i; ++j) { */
+	/* 		y[i] = y[i] - a[j + 1] * y[i - j + 1]; */
+	/* 	} */
+	/* } */
 
 	/* lpc decode */
 	/* vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, output, */
 	/* 		CHUNK_SIZE); */
+
+	free(excitation);
 }
