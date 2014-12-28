@@ -49,7 +49,7 @@ int get_pitch_by_amdf(float *input, const size_t len)
 	/* correct the offset */
 	pitch += min_pitch;
 
-	/* free the mallocs */
+	/* free the malloc */
 	free(d);
 
 	return pitch;
@@ -64,18 +64,16 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	c = 1;
 
 	/* compute chunk energy */
-	float e = 0;
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		float val = fabs(input[i]*input[i]);
+	float e = 0, val;
 
-		if (e < val) {
-			e = val;
-		}
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		val = fabs(input[i]*input[i]);
+		e = max(e, val);
 	}
 
 	/* FIXME ? */
-	if (e < 0.02) {
-		/* discard chunk if chunk qualifies as noise */
+	if (e < 0.05) {
+		/* chunk qualifies as noise, let's discard it */
 		lpc_chunk->pitch = -1;
 		return;
 	}
@@ -158,8 +156,11 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		}
 	}
 	else {
-		/* silence */
-		memset(excitation, SAMPLE_SILENCE, sizeof(excitation));
+		/* hello darkness my old friend... */
+		memset(output, SAMPLE_SILENCE, sizeof(excitation));
+
+		/* all done */
+		return;
 	}
 
 	/* init filter coefficients */
