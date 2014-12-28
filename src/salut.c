@@ -160,19 +160,17 @@ static void *send_thread_routine(void *arg)
 	Context *ctx = (Context *) arg;
 	float *rptr = NULL;
 	int s = *ctx->socket_fd;
-	size_t sz = ctx->cb_out->elt_size;
-	size_t out_sz;
 
 	while (*ctx->running) {
 		/* send data */
 		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
-		/* TODO: LPC encoding */
-		void *out = lpc_encode(rptr, sz, &out_sz);
+		/* LPC encoding */
+		LpcChunk out = lpc_encode(rptr);
 
 		/* if (send(s, rptr, sz, 0) == -1) */
 		/* 	errno_die(); */
-		if (send(s, out, out_sz, 0) == -1)
+		if (send(s, &out, sizeof(LpcChunk), 0) == -1)
 			errno_die();
 	}
 
@@ -185,7 +183,6 @@ static void *read_thread_routine(void *arg)
 	float *wptr = NULL;
 	int s = *ctx->socket_fd;
 	int sel;
-	size_t sz = ctx->cb_in->elt_size;
 
 	while (*ctx->running) {
 		fd_set fd;
@@ -207,10 +204,14 @@ static void *read_thread_routine(void *arg)
 			/* read received data */
 			wptr = (float *) cb_get_wptr(ctx->cb_in);
 
-			if (recv(s, wptr, sz, 0) == -1)
+			LpcChunk in;
+
+			/* FIXME (size) */
+			if (recv(s, &in, sizeof(LpcChunk), 0) == -1)
 				errno_die();
 
-			/* TODO: lpc decoding */
+			/* lpc decoding */
+			lpc_decode(&in, wptr);
 
 			/* all done */
 			cb_increment_count(ctx->cb_in);
@@ -335,13 +336,13 @@ int main(int argc, char **argv)
 	handle_pa_error(err);
 
 	/* open default input stream for playing */
-	err = Pa_OpenDefaultStream(&inputStream, 2, 0, paFloat32, SAMPLE_RATE, 256,
-			recordCallback, ctx);
+	err = Pa_OpenDefaultStream(&inputStream, 2, 0, paFloat32, SAMPLE_RATE,
+			BUF_SIZE, recordCallback, ctx);
 	handle_pa_error(err);
 
 	/* open default output stream for playback */
-	err = Pa_OpenDefaultStream(&outputStream, 0, 2, paFloat32, SAMPLE_RATE, 256,
-			playCallback, ctx);
+	err = Pa_OpenDefaultStream(&outputStream, 0, 2, paFloat32, SAMPLE_RATE,
+			BUF_SIZE, playCallback, ctx);
 	handle_pa_error(err);
 
 	/* start streams */

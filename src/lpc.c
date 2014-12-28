@@ -58,142 +58,83 @@ float get_pitch_by_amdf(float *input, const size_t len)
 	return pitch;
 }
 
-LpcData *lpc_data_init(const size_t input_len)
+void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 {
-	LpcData *lpc_data = NULL;
-	LpcChunk *chunks = NULL;
-
-	size_t n_chunks = input_len / WINDOW_SIZE;
-
-	/* create a struct to store the lpc analysis results */
-	lpc_data = calloc(1, sizeof(*lpc_data));
-	handle_alloc_error(lpc_data);
-
-	/* allocate memory for the chunks */
-	chunks = calloc(n_chunks, sizeof(*chunks));
-	handle_alloc_error(chunks);
-
-	/* fill struct info */
-	lpc_data->n_chunks = n_chunks;
-	lpc_data->chunk_size = WINDOW_SIZE;
-	lpc_data->chunks = chunks;
-
-	return lpc_data;
-}
-
-void lpc_data_free(LpcData *lpc_data)
-{
-	/* free the mallocs... */
-	free(lpc_data->chunks);
-	free(lpc_data);
-}
-
-void lpc_detect_voiced(float *input, LpcData *lpc_data)
-{
-	unsigned int i, j, c;
+	unsigned int j, c;
 	float val1, val2, p, f;
 
-	/* count the number of zero crossings in each chunks */
-	for (i = 0; i < lpc_data->n_chunks; ++i) {
+	/* zero crossing counter */
+	c = 1;
 
-		/* zero crossing counter */
-		c = 1;
+	/* TODO: discard chunk if chunk qualifies as (white) noise */
+	for (j = 1; j < CHUNK_SIZE; ++j) {
+		val1 = input[CHUNK_SIZE + j];
+		val2 = input[CHUNK_SIZE + j + 1];
 
-		/* TODO: discard chunk if chunk qualifies as (white) noise */
-		for (j = 1; j < lpc_data->chunk_size; ++j) {
-			val1 = input[i * lpc_data->chunk_size + j];
-			val2 = input[i * lpc_data->chunk_size + j + 1];
-
-			/* yup, it's a zero crossing */
-			if ((val1 * val2) < 0) {
-				c++;
-			}
+		/* yup, it's a zero crossing */
+		if ((val1 * val2) < 0) {
+			c++;
 		}
+	}
 
-		/* TODO: skip these steps by using a threshold directly based on the
-		 * number of zero crossings (converted from the max frequency). */
+	/* TODO: skip these steps by using a threshold directly based on the
+	 * number of zero crossings (converted from the max frequency). */
 
-		/* compute period */
-		p = 2 * lpc_data->chunk_size / c;
+	/* compute period */
+	p = 2 * CHUNK_SIZE / c;
 
-		/* compute frequency */
-		f = 1 / (2 * p);
+	/* compute frequency */
+	f = 1 / (2 * p);
 
-		/* set as voiced if criterion is fullfilled */
-		if (f > F_THRESHOLD) {
-			lpc_data->chunks[i].pitch = 1;
-		}
+	/* set as voiced if criterion is fullfilled */
+	if (f > F_THRESHOLD) {
+		lpc_chunk->pitch = 1;
 	}
 }
 
-LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz)
+LpcChunk lpc_encode(float *input)
 {
-	LpcChunk *lpc_chunk = NULL;
-	LpcData *lpc_data = NULL;
-
-	float *chunk_ptr = NULL;
-	unsigned int i;
-
-	/* create a struct for the results */
-	lpc_data = lpc_data_init(input_len);
-
 	/* pre emphasis filter */
 	/* TODO */
+	LpcChunk lpc_chunk;
 
 	/* detect voiced/ non-voiced sound */
-	lpc_detect_voiced(input, lpc_data);
+	lpc_detect_voiced(input, &lpc_chunk);
 
 	/* TODO: use autocorrelation to compute the pitch (?) */
 
 	/* as AMDF is simpler to implement, let's use it for now */
-	for (i = 0; i < lpc_data->n_chunks; ++i) {
-		lpc_chunk = &lpc_data->chunks[i];
 
-		/* skip step for non-voiced sounds */
-		if (lpc_chunk->pitch == 0)
-			continue;
+	/* skip step for non-voiced sounds */
+	if (lpc_chunk.pitch == 0) {
 
-		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
-		lpc_chunk->pitch = get_pitch_by_amdf(chunk_ptr, lpc_data->chunk_size);
+	}
+	else {
+		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 
-	/* compute lpc coefficients */
-	for (i = 0; i < lpc_data->n_chunks; ++i) {
-		lpc_chunk = &lpc_data->chunks[i];
-		chunk_ptr = (float *) &input[lpc_data->chunk_size * i];
+	/* Compute LPC thx to libvorbis function. TODO: use the error ? */
+	vorbis_lpc_from_data(input, lpc_chunk.coefficients,
+			CHUNK_SIZE, N_COEFFS);
 
-		/* Compute LPC thx to libvorbis function. TODO: use the error ? */
-		vorbis_lpc_from_data(chunk_ptr, lpc_chunk->coefficients,
-				lpc_data->chunk_size, N_COEFFS);
-	}
-
-	*sz = sizeof(lpc_data);
-
-	return lpc_data;
+	return lpc_chunk;
 }
 
-void lpc_decode(LpcData *lpc_data, float *output)
+void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
-	unsigned int i;
-	LpcChunk *lpc_chunk = NULL;
+	/* compute excitation */
 
-	float *out_ptr;
+	if (lpc_chunk->pitch > 0) {
+		/* voiced sound, use a pulse impulsion train */
 
-	for (i = 0; i < lpc_data->n_chunks; ++i) {
-		/* compute excitation */
-
-		if (lpc_chunk->pitch > 0) {
-			/* voiced sound, use a pulse impulsion train */
-
-		}
-		else {
-			/* non voiced sound, use a white noise */
-		}
-
-		out_ptr = &output[lpc_data->chunk_size * i];
-
-		/* lpc decode */
-		vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, out_ptr,
-				lpc_data->chunk_size);
 	}
+	else {
+		/* non voiced sound, use a white noise */
+	}
+
+	printf("chunk pitch: %f\n", lpc_chunk->pitch);
+
+	/* lpc decode */
+	vorbis_lpc_predict(lpc_chunk->coefficients, NULL, N_COEFFS, output,
+			CHUNK_SIZE);
 }

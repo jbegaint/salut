@@ -6,6 +6,8 @@
 /* #define WINDOW_SIZE 256 */
 #define WINDOW_SIZE 512
 
+#define CHUNK_SIZE 512
+
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
  */
@@ -18,19 +20,12 @@ typedef struct {
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;
 
-typedef struct {
-	unsigned int n_chunks;
-	unsigned int chunk_size;
+/* LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz); */
+/* void lpc_decode(LpcData *lpc_data, float *output); */
 
-	LpcChunk *chunks;
-} LpcData;
+LpcChunk lpc_encode(float *input);
+void lpc_decode(LpcChunk *lpc_chunk, float *output);
 
-LpcData *lpc_data_init(const size_t input_len);
-void lpc_data_free(LpcData *lpc_data);
-
-LpcData *lpc_encode(float *input, const size_t input_len, size_t *sz);
-void lpc_decode(LpcData *lpc_data, float *output);
-
-void lpc_detect_voiced(float *input, LpcData *lpc_data);
+/* void lpc_detect_voiced(float *input, LpcData *lpc_data); */
 
 #endif
