@@ -19,11 +19,15 @@
 #define N_COEFFS 64
 
 typedef struct {
-	float pitch;
+	/* float pitch; */
+	int pitch;
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;
 
 LpcChunk lpc_encode(float *input);
 void lpc_decode(LpcChunk *lpc_chunk, float *output);
+
+void my_liquid_lpc(float * _x, unsigned int _n, unsigned int _p, float * _a,
+		float * _g);
 
 #endif

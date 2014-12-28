@@ -2,25 +2,15 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <liquid/liquid.h>
+
 #include "general.h"
 #include "lpc.h"
-#include "vorbis_lpc.h"
 #include "utils.h"
 
 #define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
 
-/* void hanning(const float *input, const size_t len, float *output) */
-/* { */
-/* 	unsigned int i; */
-/* 	float coef; */
-
-/* 	for (i = 0; i < len; ++i) { */
-/* 		coef = 0.5 - 0.5 * cos(2 * M_PI * i / len); */
-/* 		*output++ = *input++ * coef; */
-/* 	} */
-/* } */
-
-float get_pitch_by_amdf(float *input, const size_t len)
+int get_pitch_by_amdf(float *input, const size_t len)
 {
 	/*
 	 * Min and max pitch *in sample*. We use 50Hz and 300Hz as arbitrary pitch
@@ -28,7 +18,8 @@ float get_pitch_by_amdf(float *input, const size_t len)
 	 */
 	const unsigned int min_pitch = SAMPLE_RATE / 300;
 	const unsigned int max_pitch = SAMPLE_RATE / 50;
-	float pitch = 0, max_d = 0;
+	int pitch = 0;
+	float max_d = 0;
 	unsigned int i, j;
 	float *d = NULL;
 
@@ -111,82 +102,58 @@ LpcChunk lpc_encode(float *input)
 	/* as AMDF is simpler to implement, let's use it for now */
 
 	/* skip step for non-voiced sounds */
-	if (lpc_chunk.pitch == 0) {
-
-	}
-	else {
+	if (lpc_chunk.pitch == 1) {
 		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 
-	/* Compute LPC thx to libvorbis function. TODO: use the error ? */
-	vorbis_lpc_from_data(input, lpc_chunk.coefficients,
-			CHUNK_SIZE, N_COEFFS);
+	/* useless for now (TODO ?) */
+	float g[N_COEFFS];
+
+	/* compute lpc */
+	my_liquid_lpc(input, CHUNK_SIZE, N_COEFFS, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
 }
 
 void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
-	unsigned int i, j;
-	float *excitation = NULL;
+	unsigned int i;
+	float a_lpc[N_COEFFS];
+	float b_lpc[N_COEFFS];
+	float excitation[CHUNK_SIZE];
 
-	excitation = calloc(CHUNK_SIZE, sizeof(*excitation));
+	float *coeffs = lpc_chunk->coefficients;
 
-	/* compute excitation */
+	/* compute the excitation */
 	if (lpc_chunk->pitch > 0) {
-		/* voiced sound, use a pulse impulsion train */
-		for (i = 0; i < CHUNK_SIZE; ++i) {
-			if ((i % (int) lpc_chunk->pitch) == 0) {
-				excitation[i] = sqrt(lpc_chunk->pitch);
-			}
+		printf("%d\n", lpc_chunk->pitch);
+
+		/* if voiced, generate an impulsion train */
+		excitation[0] = 1;
+		for (i = 1; i < CHUNK_SIZE; ++i) {
+			excitation[i] = ((i % lpc_chunk->pitch) == 0) ? 1 : 0;
 		}
 	}
 	else {
-		/* non voiced sound, use a white noise */
-		/* FIXME */
+		/* generate a white noise */
+		for (i = 0; i < CHUNK_SIZE; ++i) {
+			excitation[i] = randnf();
+		}
 	}
 
-	/* filter */
-	/* a[1]y[n] = b[1]x[n]+b[2]x[n-1]+...+b[N]x[n-N+1]-a[2]y[n-1]-...-a[N]y[n-N+1]; */
+	/* init filter coefficients */
+	for (i = 0; i < N_COEFFS; ++i) {
+		a_lpc[i] = (i == 0) ? 1 : 0;
+		/* or MINUS ? */
+		b_lpc[i] = (i == 0) ? 0 : coeffs[i];
+	}
 
-	float *a = lpc_chunk->coefficients;
-	float b = 1;
-	float *x = excitation;
-	float *y = output;
+	/* filter the excitation */
+	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
 
 	for (i = 0; i < CHUNK_SIZE; ++i) {
-		y[i] = 0;
-
-		for (j = 0; j < N_COEFFS && j < i; ++j) {
-			y[i] = y[i] + b * x[i - j];
-		}
-		for (j = 1; j < N_COEFFS && j < i; ++j) {
-			y[i] = y[i] - a[j] * y[i - j];
-		}
-
-		y[i] = y[i] / a[0];
+		iirfilt_rrrf_execute(f, excitation[i], &output[i]);
 	}
 
-	/* y[0] = 1 * x[0]; */
-	/* for (i = 1; i < N_COEFFS; ++i) { */
-	/* 	y[i] = 0; */
-	/* 	for (j = 0; j < i + 1; ++j) { */
-	/* 		y[i] = y[i] + b * x[i - j]; */
-	/* 	} */
-	/* 	for (j = 0; j < i; ++j) { */
-	/* 		y[i] = y[i] - a[j + 1] * y[i - j + 1]; */
-	/* 	} */
-	/* } */
-
-	/* for (i = N_COEFFS; i < CHUNK_SIZE; ++i) { */
-	/* 	y[i] = 0; */
-	/* 	for (j = 0; j < i + 1; ++j) { */
-	/* 		y[i] = y[i] + b * x[i - j]; */
-	/* 	} */
-	/* 	for (j = 0; j < i; ++j) { */
-	/* 		y[i] = y[i] - a[j + 1] * y[i - j + 1]; */
-	/* 	} */
-	/* } */
-
-	free(excitation);
+	iirfilt_rrrf_destroy(f);
 }
