@@ -39,7 +39,6 @@ float get_pitch_by_amdf(float *input, const size_t len)
 	for (i = min_pitch; i < max_pitch; ++i) {
 
 		for (j = i; j < len; ++j) {
-			/* d[i] += fabs(input[i] - input[i - j]); */
 			d[i - min_pitch] += fabs(input[i] - input[j - i]);
 		}
 
@@ -55,7 +54,7 @@ float get_pitch_by_amdf(float *input, const size_t len)
 		}
 	}
 
-	/* corret the offset */
+	/* correct the offset */
 	pitch += min_pitch;
 
 	/* free the mallocs */
