@@ -13,12 +13,12 @@
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
  */
 #define FS SAMPLE_RATE
-#define F_THRESHOLD 0.014
+#define F_THRESHOLD 300/FS
 
 #define N_COEFFS 64
 
 typedef struct {
-	/* float pitch; */
+	/* Pitch frequency. N if voiced, 0 if non voiced, -1 if noise/silence */
 	int pitch;
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;

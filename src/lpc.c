@@ -57,13 +57,29 @@ int get_pitch_by_amdf(float *input, const size_t len)
 
 void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 {
-	unsigned int j, c;
+	unsigned int i, j, c;
 	float val1, val2, p, f;
 
 	/* zero crossing counter */
 	c = 1;
 
-	/* TODO: discard chunk if chunk qualifies as (white) noise */
+	/* compute chunk energy */
+	float e = 0;
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		float val = fabs(input[i]*input[i]);
+
+		if (e < val) {
+			e = val;
+		}
+	}
+
+	/* FIXME ? */
+	if (e < 0.02) {
+		/* discard chunk if chunk qualifies as noise */
+		lpc_chunk->pitch = -1;
+		return;
+	}
+
 	for (j = 1; j < CHUNK_SIZE; ++j) {
 		val1 = input[CHUNK_SIZE + j];
 		val2 = input[CHUNK_SIZE + j + 1];
@@ -84,6 +100,7 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	f = 1 / (2 * p);
 
 	/* set as voiced if criterion is fullfilled */
+	/* FIXME */
 	if (f > F_THRESHOLD) {
 		lpc_chunk->pitch = 1;
 	}
@@ -134,11 +151,15 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			excitation[i] = ((i % lpc_chunk->pitch) == 0) ? 1 : 0;
 		}
 	}
-	else {
+	else if (lpc_chunk->pitch == 0) {
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			excitation[i] = randnf();
 		}
+	}
+	else {
+		/* silence */
+		memset(excitation, SAMPLE_SILENCE, sizeof(excitation));
 	}
 
 	/* init filter coefficients */
