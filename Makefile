@@ -17,7 +17,7 @@ $(BIN): $(OBJ)
 	@gcc -c $< -o $@ $(CFLAGS)
 
 clean:
-	@echo "RM $(wildcard *.o) $(BIN)"
-	@rm -f *.o $(BIN)
+	@echo "RM $(OBJ) $(BIN)"
+	@rm -f $(OBJ) $(BIN)
 
 .PHONY: all clean
