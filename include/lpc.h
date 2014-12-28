@@ -12,8 +12,13 @@
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
  */
+
 #define FS SAMPLE_RATE
-#define F_THRESHOLD 300/FS
+
+#define F_THRESHOLD (300 / FS)
+
+#define MAX_FREQ 300
+#define MIN_FREQ 50
 
 #define N_COEFFS 64
 

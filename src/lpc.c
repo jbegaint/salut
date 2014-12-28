@@ -17,8 +17,9 @@ int get_pitch_by_amdf(float *input, const size_t len)
 	 * Min and max pitch *in sample*. We use 50Hz and 300Hz as arbitrary pitch
 	 * limits.
 	 */
-	const unsigned int min_pitch = SAMPLE_RATE / 300;
-	const unsigned int max_pitch = SAMPLE_RATE / 50;
+	const unsigned int min_pitch = SAMPLE_RATE / MAX_FREQ;
+	const unsigned int max_pitch = SAMPLE_RATE / MIN_FREQ;
+
 	int pitch = 0;
 	float max_d = 0;
 	unsigned int i, j;
@@ -67,7 +68,7 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	float e = 0, val;
 
 	for (i = 0; i < CHUNK_SIZE; ++i) {
-		val = fabs(input[i]*input[i]);
+		val = fabs(input[i] * input[i]);
 		e = max(e, val);
 	}
 
