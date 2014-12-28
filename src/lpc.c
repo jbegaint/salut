@@ -73,7 +73,7 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	}
 
 	/* FIXME ? */
-	if (e < 0.05) {
+	if (e < 0.04) {
 		/* chunk qualifies as noise, let's discard it */
 		lpc_chunk->pitch = -1;
 		return;
@@ -145,11 +145,8 @@ LpcChunk lpc_encode(float *input)
 	/* zero struct */
 	memset(&lpc_chunk, 0, sizeof(lpc_chunk));
 
-	/* pre emphasis filter */
-	lpc_pre_emphasis_filter(input, data);
-
 	/* detect voiced/non-voiced sound */
-	lpc_detect_voiced(data, &lpc_chunk);
+	lpc_detect_voiced(input, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
@@ -160,11 +157,19 @@ LpcChunk lpc_encode(float *input)
 	if (lpc_chunk.pitch == 1) {
 		lpc_chunk.pitch = get_pitch_by_amdf(data, CHUNK_SIZE);
 	}
+	else if (lpc_chunk.pitch == -1) {
+		return lpc_chunk;
+	}
 
 	/* prediction error variances, useless for now (TODO ?) */
 	float g[N_COEFFS];
 
 	/* compute lpc */
+
+	/* pre emphasis filter */
+	/* lpc_pre_emphasis_filter(input, data); */
+	memcpy(data, input, CHUNK_SIZE * sizeof(float));
+
 	my_liquid_lpc(data, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
@@ -188,7 +193,8 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	else if (pitch == 0) {
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
-			excitation[i] = randnf();
+			/* uniform distribution (similar to matlab's rand()) */
+			excitation[i] = (float) rand() / (float) RAND_MAX;
 		}
 	}
 	else {
@@ -219,5 +225,5 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	iirfilt_rrrf_destroy(f);
 
 	/* de-emphasis filter */
-	lpc_de_emphasis_filter(output, output);
+	/* lpc_de_emphasis_filter(output, output); */
 }
