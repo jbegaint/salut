@@ -3,7 +3,6 @@
 
 #include "general.h"
 
-/* #define CHUNK_SIZE (2 * BUF_SIZE) */
 #define CHUNK_SIZE BUF_SIZE
 
 /*
@@ -23,6 +22,7 @@
 #define MAX_PITCH ((float) FS / (float) MIN_FREQ)
 
 #define N_COEFFS 64
+/* #define N_COEFFS 24 */
 
 typedef struct {
 	/* Pitch frequency. N if voiced, 0 if non voiced, -1 if noise/silence */

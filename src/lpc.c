@@ -170,8 +170,6 @@ LpcChunk lpc_encode(float *input)
 
 	memset(data, SAMPLE_SILENCE, sizeof(data));
 
-	hanning(input, CHUNK_SIZE, input);
-
 	/* compute chunk energy */
 	float e = 0, val;
 
@@ -181,10 +179,12 @@ LpcChunk lpc_encode(float *input)
 	}
 
 	/* discard noise */
-	/* if (e < 1e-4) { */
-	/* 	lpc_chunk.pitch = -1; */
-	/* 	return lpc_chunk; */
-	/* } */
+	if (e < 1e-4) {
+		lpc_chunk.pitch = -1;
+		return lpc_chunk;
+	}
+
+	hanning(input, CHUNK_SIZE, input);
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
@@ -234,14 +234,17 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	if (pitch > 0) {
 		/* if voiced, generate an impulsion train */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
-			excitation[i] = ((i % (pitch / 1)) == 0) ? sqrt(pitch) : 0;
+			excitation[i] = ((i % pitch) == 0) ? 1 : 0;
 		}
 	}
 	else if (pitch == 0) {
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
-			/* uniform distribution (similar to matlab's rand()) */
-			excitation[i] = (float) rand() / (float) RAND_MAX;
+			/*
+			 * Uniform distribution (similar to matlab's rand()). Generate
+			 * random values between -1 and 1 (*[max-min]+min).
+			 */
+			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
 		}
 	}
 	else {
@@ -294,4 +297,17 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
+
+	/* try to fix the saturation */
+	float max = -1;
+	float min = 1;
+
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		max = max(max, output[i]);
+		min = min(min, output[i]);
+	}
+
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		output[i] = 1 * (output[i] - min) / (max - min) - 0.5;
+	}
 }
