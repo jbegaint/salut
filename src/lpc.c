@@ -176,7 +176,6 @@ LpcChunk lpc_encode(float *input)
 	float g[N_COEFFS];
 
 	/* pre emphasis filter */
-	/* hanning(input, CHUNK_SIZE, data); */
 	lpc_pre_emphasis_filter(input, data);
 
 	/* compute lpc */
@@ -189,6 +188,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 {
 	unsigned int i;
 	float excitation[CHUNK_SIZE];
+	float data[CHUNK_SIZE];
 
 	const float *coeffs = lpc_chunk->coefficients;
 	const int pitch = lpc_chunk->pitch;
@@ -229,11 +229,11 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
 
 	for (i = 0; i < CHUNK_SIZE; ++i) {
-		iirfilt_rrrf_execute(f, excitation[i], &output[i]);
+		iirfilt_rrrf_execute(f, excitation[i], &data[i]);
 	}
 
 	iirfilt_rrrf_destroy(f);
 
 	/* de-emphasis filter */
-	lpc_de_emphasis_filter(output, output);
+	lpc_de_emphasis_filter(data, output);
 }

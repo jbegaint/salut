@@ -45,7 +45,7 @@ static Context *ctx_init(int *running_ptr, int n_elt)
 
 	/*
 	 * Init circular buffers. We use an n_elt elements array, each element being
-	 * a row of BUF_SIZE samples (*NUM_CHANNELS).
+	 * a row of BUF_SIZE samples (for each NUM_CHANNELS).
 	 */
 	sz = NUM_CHANNELS * BUF_SIZE * sizeof(float);
 
@@ -165,12 +165,20 @@ static void *send_thread_routine(void *arg)
 		/* send data */
 		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
-		/* LPC encoding */
-		LpcChunk out = lpc_encode(rptr);
+		/* unpacked data */
+		float data[2][BUF_SIZE];
 
-		/* if (send(s, rptr, sz, 0) == -1) */
-		/* 	errno_die(); */
-		if (send(s, &out, sizeof(LpcChunk), 0) == -1)
+		for (int i = 0; i < BUF_SIZE; ++i) {
+			data[0][i] = rptr[i];
+			data[1][i] = rptr[i + BUF_SIZE];
+		}
+
+		/* LPC encoding */
+		LpcData out;
+		out.chunks[0] = lpc_encode(data[0]);
+		out.chunks[1] = lpc_encode(data[1]);
+
+		if (send(s, &out, sizeof(LpcData), 0) == -1)
 			errno_die();
 	}
 
@@ -201,17 +209,28 @@ static void *read_thread_routine(void *arg)
 			errno_die();
 
 		if (FD_ISSET(s, &fd)) {
+
+			LpcData in;
+
+			float data_left[BUF_SIZE];
+			float data_right[BUF_SIZE];
+
 			/* read received data */
-			wptr = (float *) cb_get_wptr(ctx->cb_in);
-
-			LpcChunk in;
-
-			/* FIXME (size) */
-			if (recv(s, &in, sizeof(LpcChunk), 0) == -1)
+			if (recv(s, &in, sizeof(LpcData), 0) == -1)
 				errno_die();
 
 			/* lpc decoding */
-			lpc_decode(&in, wptr);
+			lpc_decode(&in.chunks[0], data_left);
+			lpc_decode(&in.chunks[1], data_right);
+
+			/* packed data */
+
+			wptr = (float *) cb_get_wptr(ctx->cb_in);
+
+			for (int i = 0; i < BUF_SIZE; ++i) {
+				wptr[i] = data_left[i];
+				wptr[i + BUF_SIZE] = data_right[i];
+			}
 
 			/* all done, data is written */
 			cb_increment_count(ctx->cb_in);

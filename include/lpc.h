@@ -3,7 +3,7 @@
 
 #include "general.h"
 
-#define CHUNK_SIZE (NUM_CHANNELS * BUF_SIZE)
+#define CHUNK_SIZE BUF_SIZE
 
 /*
  * Threshold for voiced detection. We use fmax ~= 300 Hz, ie 300/Fs in samples.
@@ -23,6 +23,11 @@ typedef struct {
 	int pitch;
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;
+
+typedef struct {
+	/* left and right chunks */
+	LpcChunk chunks[2];
+} LpcData;
 
 LpcChunk lpc_encode(float *input);
 void lpc_decode(LpcChunk *lpc_chunk, float *output);
