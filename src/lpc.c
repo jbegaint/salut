@@ -72,16 +72,13 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	unsigned int i, j, c;
 	float val1, val2, p, f;
 
-	/* zero crossing counter */
-	c = 1;
-
 	/* compute chunk energy */
-	float e = 0, val;
+	/* float e = 0, val; */
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		val = fabs(input[i] * input[i]);
-		e = max(e, val);
-	}
+	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
+	/* 	val = fabs(input[i] * input[i]); */
+	/* 	e = max(e, val); */
+	/* } */
 
 	/* FIXME */
 	/* if (e < 0.02) { */
@@ -90,7 +87,10 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 		/* return; */
 	/* } */
 
-	for (j = 1; j < CHUNK_SIZE; ++j) {
+	/* zero crossing counter */
+	c = 1;
+
+	for (j = 1; j < CHUNK_SIZE - 1; ++j) {
 		val1 = input[CHUNK_SIZE + j];
 		val2 = input[CHUNK_SIZE + j + 1];
 
@@ -99,6 +99,17 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 			c++;
 		}
 	}
+
+	printf("C = %d\n", c);
+
+	/* if ((CHUNK_SIZE/c) < MIN_PITCH) { */
+	/* 	printf("UNVOICED\n"); */
+	/* 	lpc_chunk->pitch = 0; */
+	/* } */
+	/* else { */
+	/* 	lpc_chunk->pitch = 1; */
+	/* } */
+	/* return; */
 
 	/* TODO: skip these steps by using a threshold directly based on the
 	 * number of zero crossings (converted from the max frequency). */
@@ -111,8 +122,11 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 
 	/* set as voiced if criterion is fullfilled */
 	/* FIXME */
+
 	if (f > F_THRESHOLD) {
 		lpc_chunk->pitch = 1;
+	}
+	else {
 	}
 }
 
@@ -158,13 +172,13 @@ LpcChunk lpc_encode(float *input)
 
 	memset(data, SAMPLE_SILENCE, sizeof(data));
 
-	hanning(input, CHUNK_SIZE, input);
-
-	/* detect voiced/non-voiced sound */
-	lpc_detect_voiced(input, &lpc_chunk);
+	/* hanning(input, CHUNK_SIZE, input); */
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
+
+	/* detect voiced/non-voiced sound */
+	lpc_detect_voiced(input, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
@@ -243,9 +257,8 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		for (i = 0; i < N_COEFFS; ++i) {
 			a_lpc[i] = (i == 0) ? 1 : y * a_lpc[i];
 
-			if (fabs(a_lpc[i]) > 1) {
+			if (fabs(a_lpc[i]) > 1)
 				stable = 0;
-			}
 		}
 		c++;
 	} while ((!stable) && (c < 20));

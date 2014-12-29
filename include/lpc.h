@@ -19,8 +19,8 @@
 #define MIN_FREQ 50
 
 /* in samples */
-#define MIN_PITCH (FS / MAX_FREQ)
-#define MAX_PITCH (FS / MIN_FREQ)
+#define MIN_PITCH ((float) FS / (float) MAX_FREQ)
+#define MAX_PITCH ((float) FS / (float) MIN_FREQ)
 
 #define N_COEFFS 64
 

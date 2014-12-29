@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <string.h>
 #include <semaphore.h>
+#include <errno.h>
 
 #include "circbuf.h"
 #include "utils.h"
@@ -38,6 +40,30 @@ char *cb_get_rptr(CircularBuffer *cb)
 {
 	if (sem_wait(&cb->sem) == -1)
 		errno_die();
+
+	cb->start = (cb->start + 1) % cb->size;
+
+	return &cb->data[cb->start * cb->elt_size];
+}
+
+char *cb_try_get_rptr(CircularBuffer *cb)
+{
+	struct timespec timeout;
+
+	if (clock_gettime(CLOCK_REALTIME, &timeout) == 1)
+		errno_die();
+
+	/* calculate relatime interval for the timeout */
+	timeout.tv_sec += 1;
+
+	/* TODO: decrease timeout value */
+
+	if (sem_timedwait(&cb->sem, &timeout) == -1) {
+		if (errno == ETIMEDOUT)
+			return NULL;
+		else
+			errno_die();
+	}
 
 	cb->start = (cb->start + 1) % cb->size;
 

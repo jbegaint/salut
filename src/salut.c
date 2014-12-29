@@ -70,13 +70,18 @@ static void ctx_free(Context *ctx)
 	free(ctx);
 }
 
+static void on_quit(void)
+{
+	running = 0;
+
+	fprintf(stderr, "Exiting...\n");
+}
+
 static void sigint_handler(int signum)
 {
 	UNUSED(signum);
 
-	running = 0;
-
-	fprintf(stderr, "Exiting...\n");
+	on_quit();
 }
 
 static int playCallback(const void *input, void *output,
@@ -96,7 +101,7 @@ static int playCallback(const void *input, void *output,
 	UNUSED(timeInfo);
 	UNUSED(user_data);
 
-	if (!*ctx->running)
+	if (!(*ctx->running))
 		return paComplete;
 
 	/* get pointer to readable circbuf data */
@@ -128,7 +133,7 @@ static int recordCallback(const void *input, void *output,
 	UNUSED(timeInfo);
 	UNUSED(user_data);
 
-	if (!*ctx->running)
+	if (!(*ctx->running))
 		return paComplete;
 
 	/* get pointer to writable circbuf data */
@@ -162,24 +167,40 @@ static void *send_thread_routine(void *arg)
 	int s = *ctx->socket_fd;
 
 	while (*ctx->running) {
-		/* send data */
-		rptr = (float *) cb_get_rptr(ctx->cb_out);
+
+		/* do not get lost here while we are waiting for a buffer */
+		do {
+			rptr = (float *) cb_try_get_rptr(ctx->cb_out);
+		} while (rptr == NULL && *ctx->running);
+
+		if (!*ctx->running)
+			break;
 
 		/* unpacked data */
 		float data[2][CHUNK_SIZE];
 
 		for (int i = 0; i < CHUNK_SIZE; ++i) {
+			/* left and right */
 			data[0][i] = *rptr++;
 			data[1][i] = *rptr++;
 		}
 
 		/* LPC encoding */
 		LpcData out;
-		out.chunks[0] = lpc_encode(data[0]);
+		out.chunks[0] = lpc_encode(data[1]);
 		out.chunks[1] = lpc_encode(data[1]);
 
-		if (send(s, &out, sizeof(LpcData), 0) == -1)
-			errno_die();
+		/* send data */
+		if (send(s, &out, sizeof(LpcData), 0) == -1) {
+			if (errno == ECONNREFUSED) {
+				on_quit();
+				fprintf(stderr, "Could not connect to peer.\n");
+				return NULL;
+			}
+			else {
+				errno_die();
+			}
+		}
 	}
 
 	return NULL;
@@ -203,7 +224,7 @@ static void *read_thread_routine(void *arg)
 
 		do {
 			sel = select(s + 1, &fd, NULL, NULL, &tv);
-		} while ((sel == -1) && (errno == EINTR));
+		} while ((sel == -1) && (errno == EINTR) && *ctx->running);
 
 		if (sel == -1)
 			errno_die();
@@ -214,8 +235,16 @@ static void *read_thread_routine(void *arg)
 			float data[2][CHUNK_SIZE];
 
 			/* read received data */
-			if (recv(s, &in, sizeof(LpcData), 0) == -1)
-				errno_die();
+			if (recv(s, &in, sizeof(LpcData), 0) == -1) {
+				if (errno == ECONNREFUSED) {
+					on_quit();
+					fprintf(stderr, "Could not connect to peer.\n");
+					return NULL;
+				}
+				else {
+					errno_die();
+				}
+			}
 
 			/* lpc decoding */
 			lpc_decode(&in.chunks[0], data[0]);
@@ -225,6 +254,7 @@ static void *read_thread_routine(void *arg)
 
 			/* packed data */
 			for (int i = 0; i < CHUNK_SIZE; ++i) {
+				/* left and right */
 				*wptr++ = data[0][i];
 				*wptr++ = data[1][i];
 			}

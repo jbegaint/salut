@@ -17,6 +17,7 @@ void cb_free(CircularBuffer *cb);
 
 char *cb_get_rptr(CircularBuffer *cb);
 char *cb_get_wptr(CircularBuffer *cb);
+char *cb_try_get_rptr(CircularBuffer *cb);
 
 void cb_increment_count(CircularBuffer *cb);
 
