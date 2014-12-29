@@ -299,15 +299,15 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	lpc_de_emphasis_filter(data, output);
 
 	/* try to fix the saturation */
-	float max = -1;
-	float min = 1;
+	/* float max = -1; */
+	/* float min = 1; */
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		max = max(max, output[i]);
-		min = min(min, output[i]);
-	}
+	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
+	/* 	max = max(max, output[i]); */
+	/* 	min = min(min, output[i]); */
+	/* } */
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		output[i] = 1 * (output[i] - min) / (max - min) - 0.5;
-	}
+	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
+	/* 	output[i] = 1 * (output[i] - min) / (max - min) - 0.5; */
+	/* } */
 }
