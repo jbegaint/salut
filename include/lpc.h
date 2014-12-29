@@ -3,6 +3,7 @@
 
 #include "general.h"
 
+/* #define CHUNK_SIZE (2 * BUF_SIZE) */
 #define CHUNK_SIZE BUF_SIZE
 
 /*

@@ -169,8 +169,8 @@ static void *send_thread_routine(void *arg)
 		float data[2][CHUNK_SIZE];
 
 		for (int i = 0; i < CHUNK_SIZE; ++i) {
-			data[0][i] = rptr[i];
-			data[1][i] = rptr[i + CHUNK_SIZE];
+			data[0][i] = *rptr++;
+			data[1][i] = *rptr++;
 		}
 
 		/* LPC encoding */
@@ -211,7 +211,6 @@ static void *read_thread_routine(void *arg)
 		if (FD_ISSET(s, &fd)) {
 
 			LpcData in;
-
 			float data[2][CHUNK_SIZE];
 
 			/* read received data */
@@ -226,8 +225,8 @@ static void *read_thread_routine(void *arg)
 
 			/* packed data */
 			for (int i = 0; i < CHUNK_SIZE; ++i) {
-				wptr[i] = data[0][i];
-				wptr[i + BUF_SIZE] = data[1][i];
+				*wptr++ = data[0][i];
+				*wptr++ = data[1][i];
 			}
 
 			/* all done, data is written */
