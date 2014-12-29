@@ -5,6 +5,7 @@
 /* #define SAMPLE_RATE 44100 */
 /* #define SAMPLE_RATE 22050 */
 #define SAMPLE_RATE 16000
+/* #define SAMPLE_RATE 11025 */
 #endif
 
 #define SAMPLE_SILENCE 0.0f

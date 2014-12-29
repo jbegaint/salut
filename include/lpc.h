@@ -13,8 +13,13 @@
 
 #define F_THRESHOLD (300 / FS)
 
+/* in Hertz... */
 #define MAX_FREQ 300
 #define MIN_FREQ 50
+
+/* in samples */
+#define MIN_PITCH (FS / MAX_FREQ)
+#define MAX_PITCH (FS / MIN_FREQ)
 
 #define N_COEFFS 64
 

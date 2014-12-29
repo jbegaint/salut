@@ -12,7 +12,7 @@
 
 void init_peer_addr(struct sockaddr_in *peer_addr, int host)
 {
-	memset(peer_addr, 0, sizeof(*peer_addr));
+	CLEAR(*peer_addr);
 
 	peer_addr->sin_family = AF_INET;
 	peer_addr->sin_port = htons(DFLT_PORT);

@@ -83,7 +83,7 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 		e = max(e, val);
 	}
 
-	/* FIXME ? */
+	/* FIXME */
 	if (e < 0.04) {
 		/* chunk qualifies as noise, let's discard it */
 		lpc_chunk->pitch = -1;
@@ -154,29 +154,34 @@ LpcChunk lpc_encode(float *input)
 	float data[CHUNK_SIZE];
 
 	/* zero struct */
-	memset(&lpc_chunk, 0, sizeof(lpc_chunk));
+	CLEAR(lpc_chunk);
+
+	memset(data, SAMPLE_SILENCE, sizeof(data));
+
+	/* hanning(input, CHUNK_SIZE, input); */
+
+	/* pre emphasis filter */
+	lpc_pre_emphasis_filter(input, data);
 
 	/* detect voiced/non-voiced sound */
-	lpc_detect_voiced(input, &lpc_chunk);
+	lpc_detect_voiced(data, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
 	 * implement, let's use it for now.
 	 */
 
-	/* skip step for non-voiced sounds */
+	/* compute pitch if voiced */
 	if (lpc_chunk.pitch == 1) {
 		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 	else if (lpc_chunk.pitch == -1) {
+		/* skip step for non-voiced sounds */
 		return lpc_chunk;
 	}
 
 	/* prediction error variances, useless for now (TODO ?) */
 	float g[N_COEFFS];
-
-	/* pre emphasis filter */
-	lpc_pre_emphasis_filter(input, data);
 
 	/* compute lpc */
 	my_liquid_lpc(data, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
@@ -192,6 +197,8 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	const float *coeffs = lpc_chunk->coefficients;
 	const int pitch = lpc_chunk->pitch;
+
+	memset(output, SAMPLE_SILENCE, sizeof(excitation));
 
 	/* compute the excitation */
 	if (pitch > 0) {
@@ -209,18 +216,20 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	}
 	else {
 		/* hello darkness my old friend... */
-		memset(output, SAMPLE_SILENCE, sizeof(excitation));
-
-		/* all done */
 		return;
 	}
 
 	/* init filter coefficients */
+	float a_lpc[N_COEFFS];
 	float b_lpc[N_COEFFS];
-	float *a_lpc = (float *) coeffs;
 
-	memset(&b_lpc, 0, sizeof(b_lpc));
-	b_lpc[0] = 1;
+	/* CLEAR(b_lpc); */
+	/* b_lpc[0] = 1; */
+
+	for (i = 0; i < N_COEFFS; ++i) {
+		b_lpc[i] = (i == 0) ? 1 : 0;
+		a_lpc[i] = (i == 0) ? 1 : coeffs[i];
+	}
 
 	/* filter the excitation */
 	/* liquid dsp: iirfilt_rrrf loopfilter = iirfilt_rrrf_create(b,3,a,3); */

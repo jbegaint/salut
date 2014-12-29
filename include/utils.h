@@ -3,6 +3,8 @@
 
 #define UNUSED(x) (void)(x)
 
+#define CLEAR(x) memset(&(x), 0, sizeof(x))
+
 /* usefull math macros (from kernel.h) */
 #define min(x, y) __extension__({               \
 		typeof(x) _min1 = (x);                  \
