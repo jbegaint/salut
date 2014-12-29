@@ -100,8 +100,6 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 		}
 	}
 
-	printf("C = %d\n", c);
-
 	/* if ((CHUNK_SIZE/c) < MIN_PITCH) { */
 	/* 	printf("UNVOICED\n"); */
 	/* 	lpc_chunk->pitch = 0; */
@@ -172,31 +170,44 @@ LpcChunk lpc_encode(float *input)
 
 	memset(data, SAMPLE_SILENCE, sizeof(data));
 
-	/* hanning(input, CHUNK_SIZE, input); */
+	hanning(input, CHUNK_SIZE, input);
+
+	/* compute chunk energy */
+	float e = 0, val;
+
+	for (int i = 0; i < CHUNK_SIZE; ++i) {
+		val = fabs(input[i] * input[i]);
+		e = max(e, val);
+	}
+
+	/* discard noise */
+	/* if (e < 1e-4) { */
+	/* 	lpc_chunk.pitch = -1; */
+	/* 	return lpc_chunk; */
+	/* } */
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
-
-	/* detect voiced/non-voiced sound */
-	lpc_detect_voiced(input, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
 	 * implement, let's use it for now.
 	 */
 
-	/* compute pitch if voiced */
-	if (lpc_chunk.pitch == 1) {
-		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
-	}
-	else if (lpc_chunk.pitch == -1) {
-		/* skip step for silence */
-		return lpc_chunk;
-	}
+	/* compute pitch */
+	int pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 
-	/* check if pitch value is coherent */
-	if (lpc_chunk.pitch > MAX_PITCH) {
+	if (pitch > MAX_PITCH) {
+		/* discard */
+		lpc_chunk.pitch = -1;
+	}
+	else if (pitch < MIN_PITCH) {
+		/* non voiced */
 		lpc_chunk.pitch = 0;
+	}
+	else {
+		/* voiced */
+		lpc_chunk.pitch = pitch;
 	}
 
 	/* prediction error variances, useless for now (TODO ?) */
@@ -235,6 +246,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	}
 	else {
 		/* hello darkness my old friend... */
+		/* TODO: comfort noise generator ? */
 		return;
 	}
 
