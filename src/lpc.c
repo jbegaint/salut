@@ -84,11 +84,11 @@ void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 	}
 
 	/* FIXME */
-	if (e < 0.04) {
+	/* if (e < 0.02) { */
 		/* chunk qualifies as noise, let's discard it */
-		lpc_chunk->pitch = -1;
-		return;
-	}
+		/* lpc_chunk->pitch = -1; */
+		/* return; */
+	/* } */
 
 	for (j = 1; j < CHUNK_SIZE; ++j) {
 		val1 = input[CHUNK_SIZE + j];
@@ -158,13 +158,13 @@ LpcChunk lpc_encode(float *input)
 
 	memset(data, SAMPLE_SILENCE, sizeof(data));
 
-	/* hanning(input, CHUNK_SIZE, input); */
+	hanning(input, CHUNK_SIZE, input);
+
+	/* detect voiced/non-voiced sound */
+	lpc_detect_voiced(input, &lpc_chunk);
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
-
-	/* detect voiced/non-voiced sound */
-	lpc_detect_voiced(data, &lpc_chunk);
 
 	/*
 	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
@@ -176,8 +176,13 @@ LpcChunk lpc_encode(float *input)
 		lpc_chunk.pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
 	}
 	else if (lpc_chunk.pitch == -1) {
-		/* skip step for non-voiced sounds */
+		/* skip step for silence */
 		return lpc_chunk;
+	}
+
+	/* check if pitch value is coherent */
+	if (lpc_chunk.pitch > MAX_PITCH) {
+		lpc_chunk.pitch = 0;
 	}
 
 	/* prediction error variances, useless for now (TODO ?) */
@@ -204,7 +209,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	if (pitch > 0) {
 		/* if voiced, generate an impulsion train */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
-			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
+			excitation[i] = ((i % (pitch / 1)) == 0) ? sqrt(pitch) : 0;
 		}
 	}
 	else if (pitch == 0) {
@@ -223,12 +228,31 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	float a_lpc[N_COEFFS];
 	float b_lpc[N_COEFFS];
 
-	/* CLEAR(b_lpc); */
-	/* b_lpc[0] = 1; */
+	CLEAR(b_lpc);
+	b_lpc[0] = 1;
+	memcpy(a_lpc, coeffs, sizeof(a_lpc));
 
-	for (i = 0; i < N_COEFFS; ++i) {
-		b_lpc[i] = (i == 0) ? 1 : 0;
-		a_lpc[i] = (i == 0) ? 1 : coeffs[i];
+	/* BWE method */
+	float y = 0.95;
+	int stable;
+	int c = 0;
+
+	/* check if the filter is stable, ie: poles are within the unit circle */
+	do {
+		stable = 1;
+		for (i = 0; i < N_COEFFS; ++i) {
+			a_lpc[i] = (i == 0) ? 1 : y * a_lpc[i];
+
+			if (fabs(a_lpc[i]) > 1) {
+				stable = 0;
+			}
+		}
+		c++;
+	} while ((!stable) && (c < 20));
+
+	if (c == 20) {
+		/* discard these coefficients */
+		memset(a_lpc, 0, sizeof(a_lpc));
 	}
 
 	/* filter the excitation */
