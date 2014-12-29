@@ -16,13 +16,20 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <opus/opus.h>
+
 #include "circbuf.h"
 #include "general.h"
-#include "lpc.h"
 #include "udp.h"
 #include "utils.h"
 
 #define MAX_LEN 256
+
+#define FRAME_SIZE 960
+/* #define FRAME_SIZE 480 */
+
+#define BUF_SIZE FRAME_SIZE
+#define MAX_PACKET_SIZE 3000
 
 #define handle_pa_error(err) if (err != paNoError) goto done
 
@@ -166,6 +173,13 @@ static void *send_thread_routine(void *arg)
 	float *rptr = NULL;
 	int s = *ctx->socket_fd;
 
+	int error;
+	OpusEncoder *encoder = opus_encoder_create(16000, NUM_CHANNELS,
+			OPUS_APPLICATION_VOIP, &error);
+	if (error < 0) {
+		die("Failed to create encoder: %s\n", opus_strerror(error));
+	}
+
 	while (*ctx->running) {
 
 		/* do not get lost here while we are waiting for a buffer */
@@ -176,22 +190,16 @@ static void *send_thread_routine(void *arg)
 		if (!*ctx->running)
 			break;
 
-		/* unpacked data */
-		float data[2][CHUNK_SIZE];
-
-		for (int i = 0; i < CHUNK_SIZE; ++i) {
-			/* left and right */
-			data[0][i] = *rptr++;
-			data[1][i] = *rptr++;
+		unsigned char data[MAX_PACKET_SIZE];
+		int nbBytes = opus_encode_float(encoder, rptr, FRAME_SIZE, data,
+				MAX_PACKET_SIZE);
+		if (nbBytes < 0) {
+			die("Failed to encode frame: %s\n", opus_strerror(nbBytes));
 		}
 
-		/* LPC encoding */
-		LpcData out;
-		out.chunks[0] = lpc_encode(data[1]);
-		out.chunks[1] = lpc_encode(data[1]);
-
 		/* send data */
-		if (send(s, &out, sizeof(LpcData), 0) == -1) {
+		if (send(s, data, nbBytes, 0) == -1) {
+			printf("send");
 			if (errno == ECONNREFUSED) {
 				on_quit();
 				fprintf(stderr, "Could not connect to peer.\n");
@@ -213,6 +221,12 @@ static void *read_thread_routine(void *arg)
 	int s = *ctx->socket_fd;
 	int sel;
 
+	int error;
+	OpusDecoder *decoder = opus_decoder_create(SAMPLE_RATE, NUM_CHANNELS, &error);
+	if (error < 0) {
+		die("Failed to create decoder: %s\n", opus_strerror(error));
+	}
+
 	while (*ctx->running) {
 		fd_set fd;
 		FD_ZERO(&fd);
@@ -231,11 +245,12 @@ static void *read_thread_routine(void *arg)
 
 		if (FD_ISSET(s, &fd)) {
 
-			LpcData in;
-			float data[2][CHUNK_SIZE];
+			float data[NUM_CHANNELS * FRAME_SIZE];
 
 			/* read received data */
-			if (recv(s, &in, sizeof(LpcData), 0) == -1) {
+			int sz;
+			sz = recv(s, data, MAX_PACKET_SIZE, 0);
+			if (sz == -1) {
 				if (errno == ECONNREFUSED) {
 					on_quit();
 					fprintf(stderr, "Could not connect to peer.\n");
@@ -246,17 +261,11 @@ static void *read_thread_routine(void *arg)
 				}
 			}
 
-			/* lpc decoding */
-			lpc_decode(&in.chunks[0], data[0]);
-			lpc_decode(&in.chunks[1], data[1]);
-
 			wptr = (float *) cb_get_wptr(ctx->cb_in);
-
-			/* packed data */
-			for (int i = 0; i < CHUNK_SIZE; ++i) {
-				/* left and right */
-				*wptr++ = data[0][i];
-				*wptr++ = data[1][i];
+			int frame_size;
+			frame_size = opus_decode_float(decoder, (unsigned char *) data, sz, wptr, FRAME_SIZE, 0);
+			if (frame_size < 0) {
+				die("Failed to decode : %s\n", opus_strerror(frame_size));
 			}
 
 			/* all done, data is written */
