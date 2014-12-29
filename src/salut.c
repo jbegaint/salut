@@ -166,11 +166,11 @@ static void *send_thread_routine(void *arg)
 		rptr = (float *) cb_get_rptr(ctx->cb_out);
 
 		/* unpacked data */
-		float data[2][BUF_SIZE];
+		float data[2][CHUNK_SIZE];
 
-		for (int i = 0; i < BUF_SIZE; ++i) {
+		for (int i = 0; i < CHUNK_SIZE; ++i) {
 			data[0][i] = rptr[i];
-			data[1][i] = rptr[i + BUF_SIZE];
+			data[1][i] = rptr[i + CHUNK_SIZE];
 		}
 
 		/* LPC encoding */
@@ -212,24 +212,22 @@ static void *read_thread_routine(void *arg)
 
 			LpcData in;
 
-			float data_left[BUF_SIZE];
-			float data_right[BUF_SIZE];
+			float data[2][CHUNK_SIZE];
 
 			/* read received data */
 			if (recv(s, &in, sizeof(LpcData), 0) == -1)
 				errno_die();
 
 			/* lpc decoding */
-			lpc_decode(&in.chunks[0], data_left);
-			lpc_decode(&in.chunks[1], data_right);
-
-			/* packed data */
+			lpc_decode(&in.chunks[0], data[0]);
+			lpc_decode(&in.chunks[1], data[1]);
 
 			wptr = (float *) cb_get_wptr(ctx->cb_in);
 
-			for (int i = 0; i < BUF_SIZE; ++i) {
-				wptr[i] = data_left[i];
-				wptr[i + BUF_SIZE] = data_right[i];
+			/* packed data */
+			for (int i = 0; i < CHUNK_SIZE; ++i) {
+				wptr[i] = data[0][i];
+				wptr[i + BUF_SIZE] = data[1][i];
 			}
 
 			/* all done, data is written */
