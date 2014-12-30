@@ -77,6 +77,24 @@ static void on_quit(void)
 	fprintf(stderr, "Exiting...\n");
 }
 
+static void *handle_con_refused(void)
+{
+	if (errno == ECONNREFUSED) {
+		/* peer disconnected */
+		fprintf(stderr, "Could not connect to peer.\n");
+
+		/* let's exit */
+		on_quit();
+
+	}
+	else {
+		/* something terrible happend */
+		errno_die();
+	}
+
+	return NULL;
+}
+
 static void sigint_handler(int signum)
 {
 	UNUSED(signum);
@@ -191,16 +209,8 @@ static void *send_thread_routine(void *arg)
 		out.chunks[1] = lpc_encode(data[1]);
 
 		/* send data */
-		if (send(s, &out, sizeof(LpcData), 0) == -1) {
-			if (errno == ECONNREFUSED) {
-				on_quit();
-				fprintf(stderr, "Could not connect to peer.\n");
-				return NULL;
-			}
-			else {
-				errno_die();
-			}
-		}
+		if (send(s, &out, sizeof(LpcData), 0) == -1)
+			return handle_con_refused();
 	}
 
 	return NULL;
@@ -235,16 +245,8 @@ static void *read_thread_routine(void *arg)
 			float data[2][CHUNK_SIZE];
 
 			/* read received data */
-			if (recv(s, &in, sizeof(LpcData), 0) == -1) {
-				if (errno == ECONNREFUSED) {
-					on_quit();
-					fprintf(stderr, "Could not connect to peer.\n");
-					return NULL;
-				}
-				else {
-					errno_die();
-				}
-			}
+			if (recv(s, &in, sizeof(LpcData), 0) == -1)
+				return handle_con_refused();
 
 			/* lpc decoding */
 			lpc_decode(&in.chunks[0], data[0]);

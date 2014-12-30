@@ -69,7 +69,7 @@ int get_pitch_by_amdf(float *input, const size_t len)
 
 void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
 {
-	unsigned int i, j, c;
+	unsigned int j, c;
 	float val1, val2, p, f;
 
 	/* compute chunk energy */
