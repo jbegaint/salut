@@ -22,110 +22,45 @@ void hanning(const float *input, const size_t len, float *output)
 	}
 }
 
-int get_pitch_by_amdf(float *input, const size_t len)
+int get_pitch_by_autocorr(float *input, const size_t len)
 {
-	/*
-	 * Min and max pitch *in sample*. We use 50Hz and 300Hz as arbitrary pitch
-	 * limits.
-	 */
-	const unsigned int min_pitch = SAMPLE_RATE / MAX_FREQ;
-	const unsigned int max_pitch = SAMPLE_RATE / MIN_FREQ;
+	int pitch = -1;
+	unsigned int i, k;
+	float sum, old_sum, thresh;
 
-	int pitch = 0;
-	float max_d = 0;
-	unsigned int i, j;
-	float *d = NULL;
+	int state = 1;
 
-	d = calloc(max_pitch - min_pitch, sizeof(*d));
-	handle_alloc_error(d);
+	for ( k = 0; k < len; ++k) {
+		sum += input[k] * input[k];
+	}
+	thresh = 0.2f * sum;
 
-	/* compute the difference signals */
-	for (i = min_pitch; i < max_pitch; ++i) {
+	for (i = 1; i < len; ++i) {
+		old_sum = sum;
+		sum = 0;
 
-		for (j = i; j < len; ++j) {
-			d[i - min_pitch] += fabs(input[i] - input[j - i]);
+		for (k = 0; k < len - i; ++k) {
+			sum += input[k] * input[k + i];
 		}
 
-		/* mean */
-		d[i - min_pitch] /= len - i + 1;
-	}
+		/* positive slope detected */
+		if ((state == 1) && (sum > thresh) && (sum - old_sum) > 0) {
+			state = 2;
+		}
 
-	/* determine optimal pitch */
-	for (i = 0; i < max_pitch - min_pitch; ++i) {
-		if (max_d < d[i]) {
-			max_d = d[i];
+		/* negative slope beginning, we found the second max */
+		if ((state == 2) && (sum - old_sum) < 0) {
 			pitch = i;
+			break;
 		}
 	}
-
-	/* correct the offset */
-	pitch += min_pitch;
-
-	/* free the malloc */
-	free(d);
 
 	return pitch;
 }
 
-void lpc_detect_voiced(float *input, LpcChunk *lpc_chunk)
+int get_pitch(float *input, const size_t len)
 {
-	unsigned int j, c;
-	float val1, val2, p, f;
-
-	/* compute chunk energy */
-	/* float e = 0, val; */
-
-	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
-	/* 	val = fabs(input[i] * input[i]); */
-	/* 	e = max(e, val); */
-	/* } */
-
-	/* FIXME */
-	/* if (e < 0.02) { */
-		/* chunk qualifies as noise, let's discard it */
-		/* lpc_chunk->pitch = -1; */
-		/* return; */
-	/* } */
-
-	/* zero crossing counter */
-	c = 1;
-
-	for (j = 1; j < CHUNK_SIZE - 1; ++j) {
-		val1 = input[CHUNK_SIZE + j];
-		val2 = input[CHUNK_SIZE + j + 1];
-
-		/* yup, it's a zero crossing */
-		if ((val1 * val2) < 0) {
-			c++;
-		}
-	}
-
-	/* if ((CHUNK_SIZE/c) < MIN_PITCH) { */
-	/* 	printf("UNVOICED\n"); */
-	/* 	lpc_chunk->pitch = 0; */
-	/* } */
-	/* else { */
-	/* 	lpc_chunk->pitch = 1; */
-	/* } */
-	/* return; */
-
-	/* TODO: skip these steps by using a threshold directly based on the
-	 * number of zero crossings (converted from the max frequency). */
-
-	/* compute period */
-	p = 2 * CHUNK_SIZE / c;
-
-	/* compute frequency */
-	f = 1 / (2 * p);
-
-	/* set as voiced if criterion is fullfilled */
-	/* FIXME */
-
-	if (f > F_THRESHOLD) {
-		lpc_chunk->pitch = 1;
-	}
-	else {
-	}
+	return get_pitch_by_autocorr(input, len);
 }
 
 void lpc_pre_emphasis_filter(float *input, float *output)
@@ -168,8 +103,6 @@ LpcChunk lpc_encode(float *input)
 	/* zero struct */
 	CLEAR(lpc_chunk);
 
-	memset(data, SAMPLE_SILENCE, sizeof(data));
-
 	/* compute chunk energy */
 	float e = 0, val;
 
@@ -178,42 +111,47 @@ LpcChunk lpc_encode(float *input)
 		e = max(e, val);
 	}
 
-	/* discard noise */
-	if (e < 1e-4) {
+	/* heuristic value (FIXME ?) */
+	if (e < 0.1f) {
+		/* background noise */
 		lpc_chunk.pitch = -1;
 		return lpc_chunk;
 	}
 
+	/* hanning apodization */
 	hanning(input, CHUNK_SIZE, input);
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
 
-	/*
-	 * TODO: use autocorrelation to compute the pitch (?), as AMDF is simpler to
-	 * implement, let's use it for now.
-	 */
+	/* compute pitch (autocorr FTW) */
+	const int pitch = get_pitch(input, CHUNK_SIZE);
 
-	/* compute pitch */
-	int pitch = get_pitch_by_amdf(input, CHUNK_SIZE);
-
-	if (pitch > MAX_PITCH) {
-		/* discard */
+	if (pitch == -1) {
+		/* background noise, discard */
 		lpc_chunk.pitch = -1;
 	}
-	else if (pitch < MIN_PITCH) {
+	else if (pitch < MAX_PITCH) {
 		/* non voiced */
 		lpc_chunk.pitch = 0;
+	}
+	else if (pitch > MIN_PITCH) {
+		/* silence ? */
+		lpc_chunk.pitch = -1;
 	}
 	else {
 		/* voiced */
 		lpc_chunk.pitch = pitch;
 	}
 
-	/* prediction error variances, useless for now (TODO ?) */
+	/*
+	 * Compute the LPC coefficients. The prediction error variances are stored
+	 * in g. They are useless for us, but liquid-dsp segfaults if NULL is
+	 * passed.
+	 */
+
 	float g[N_COEFFS];
 
-	/* compute lpc */
 	my_liquid_lpc(data, CHUNK_SIZE, N_COEFFS - 1, lpc_chunk.coefficients, g);
 
 	return lpc_chunk;
@@ -228,6 +166,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	const float *coeffs = lpc_chunk->coefficients;
 	const int pitch = lpc_chunk->pitch;
 
+	/* hello darkness my old friend... */
 	memset(output, SAMPLE_SILENCE, sizeof(excitation));
 
 	/* compute the excitation */
@@ -248,9 +187,16 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		}
 	}
 	else {
-		/* hello darkness my old friend... */
-		/* TODO: comfort noise generator ? */
-		return;
+		/* generate a white noise */
+		for (i = 0; i < CHUNK_SIZE; ++i) {
+			/*
+			 * Uniform distribution (similar to matlab's rand()). Generate
+			 * random values between -1 and 1 (*[max-min]+min).
+			 */
+			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
+			excitation[i] *= 0.003f;
+			/* TODO: store some background noise in memory */
+		}
 	}
 
 	/* init filter coefficients */
@@ -298,16 +244,20 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
 
+	/* background noise */
+	if (lpc_chunk->pitch < 0)
+		return;
+
 	/* try to fix the saturation */
-	/* float max = -1; */
-	/* float min = 1; */
+	float max = -1;
+	float min = 1;
 
-	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
-	/* 	max = max(max, output[i]); */
-	/* 	min = min(min, output[i]); */
-	/* } */
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		max = max(max, output[i]);
+		min = min(min, output[i]);
+	}
 
-	/* for (i = 0; i < CHUNK_SIZE; ++i) { */
-	/* 	output[i] = 1 * (output[i] - min) / (max - min) - 0.5; */
-	/* } */
+	for (i = 0; i < CHUNK_SIZE; ++i) {
+		output[i] = 1 * (output[i] - min) / (max - min) - 0.5;
+	}
 }
