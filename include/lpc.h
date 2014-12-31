@@ -14,7 +14,7 @@
 #define F_THRESHOLD (300 / FS)
 
 /* in Hertz... */
-#define MAX_FREQ 300
+#define MAX_FREQ 850
 #define MIN_FREQ 50
 
 /* in samples */

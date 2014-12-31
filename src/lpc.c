@@ -112,7 +112,7 @@ LpcChunk lpc_encode(float *input)
 	}
 
 	/* heuristic value (FIXME ?) */
-	if (e < 0.1f) {
+	if (e < 0.2f) {
 		/* background noise */
 		lpc_chunk.pitch = -1;
 		return lpc_chunk;
@@ -131,12 +131,11 @@ LpcChunk lpc_encode(float *input)
 		/* background noise, discard */
 		lpc_chunk.pitch = -1;
 	}
-	else if (pitch < MAX_PITCH) {
+	else if (pitch < MIN_PITCH) {
 		/* non voiced */
 		lpc_chunk.pitch = 0;
 	}
-	else if (pitch > MIN_PITCH) {
-		/* silence ? */
+	else if (pitch > MAX_PITCH) {
 		lpc_chunk.pitch = -1;
 	}
 	else {
@@ -171,12 +170,15 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	/* compute the excitation */
 	if (pitch > 0) {
+		fprintf(stderr, "\r [x] Voiced  [ ] Unvoiced  [ ] Background Noise.");
 		/* if voiced, generate an impulsion train */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			excitation[i] = ((i % pitch) == 0) ? 1 : 0;
+			excitation[i] *= 0.02f;
 		}
 	}
 	else if (pitch == 0) {
+		fprintf(stderr, "\r [ ] Voiced  [x] Unvoiced  [ ] Background Noise.");
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			/*
@@ -184,19 +186,24 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			 * random values between -1 and 1 (*[max-min]+min).
 			 */
 			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
+
+			/* limit output saturation */
+			excitation[i] *= 0.02f;
 		}
 	}
 	else {
+		fprintf(stderr, "\r [ ] Voiced  [ ] Unvoiced  [x] Background Noise.");
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			/*
 			 * Uniform distribution (similar to matlab's rand()). Generate
 			 * random values between -1 and 1 (*[max-min]+min).
 			 */
-			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
-			excitation[i] *= 0.003f;
+			output[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
+			output[i] *= 0.0005f;
 			/* TODO: store some background noise in memory */
 		}
+		return;
 	}
 
 	/* init filter coefficients */
@@ -241,23 +248,9 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	iirfilt_rrrf_destroy(f);
 
+	hanning(output, CHUNK_SIZE, output);
+
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
 
-	/* background noise */
-	if (lpc_chunk->pitch < 0)
-		return;
-
-	/* try to fix the saturation */
-	float max = -1;
-	float min = 1;
-
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		max = max(max, output[i]);
-		min = min(min, output[i]);
-	}
-
-	for (i = 0; i < CHUNK_SIZE; ++i) {
-		output[i] = 1 * (output[i] - min) / (max - min) - 0.5;
-	}
 }
