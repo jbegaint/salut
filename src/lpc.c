@@ -258,7 +258,6 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	iirfilt_rrrf_destroy(f);
 
-/* done: */
 	hanning(data, CHUNK_SIZE, data);
 
 	/* overlapping */
