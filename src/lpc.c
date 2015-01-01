@@ -39,9 +39,8 @@ int get_pitch_by_autocorr(float *input, const size_t len)
 		old_sum = sum;
 		sum = 0;
 
-		for (k = 0; k < len - i; ++k) {
+		for (k = 0; k < len - i; ++k)
 			sum += input[k] * input[k + i];
-		}
 
 		/* positive slope detected */
 		if ((state == 1) && (sum > thresh) && (sum - old_sum) > 0) {
@@ -72,9 +71,8 @@ void lpc_pre_emphasis_filter(float *input, float *output)
 
 	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
+	for (i = 0; i < CHUNK_SIZE; ++i)
 		iirfilt_rrrf_execute(f, input[i], &output[i]);
-	}
 
 	iirfilt_rrrf_destroy(f);
 }
@@ -88,9 +86,8 @@ void lpc_de_emphasis_filter(float *input, float *output)
 
 	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
+	for (i = 0; i < CHUNK_SIZE; ++i)
 		iirfilt_rrrf_execute(f, input[i], &output[i]);
-	}
 
 	iirfilt_rrrf_destroy(f);
 }
@@ -108,7 +105,7 @@ LpcChunk lpc_encode(float *input)
 
 	for (int i = 0; i < CHUNK_SIZE; ++i) {
 		val = fabs(input[i] * input[i]);
-		e = max(e, val);
+		e = MAX(e, val);
 	}
 
 	/* heuristic value (FIXME ?) */
@@ -171,37 +168,47 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	/* compute the excitation */
 	if (pitch > 0) {
 		fprintf(stderr, "\r [x] Voiced  [ ] Unvoiced  [ ] Background Noise.");
+
 		/* if voiced, generate an impulsion train */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
-			excitation[i] = ((i % pitch) == 0) ? 1 : 0;
-			excitation[i] *= 0.02f;
+
+			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
+
+			/* limit saturation */
+			excitation[i] *= 0.01f;
 		}
 	}
 	else if (pitch == 0) {
 		fprintf(stderr, "\r [ ] Voiced  [x] Unvoiced  [ ] Background Noise.");
+
 		/* generate a white noise */
 		for (i = 0; i < CHUNK_SIZE; ++i) {
+
 			/*
 			 * Uniform distribution (similar to matlab's rand()). Generate
 			 * random values between -1 and 1 (*[max-min]+min).
 			 */
+
 			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
 
-			/* limit output saturation */
-			excitation[i] *= 0.02f;
+			/* limit saturation */
+			excitation[i] *= 0.01f;
 		}
 	}
 	else {
 		fprintf(stderr, "\r [ ] Voiced  [ ] Unvoiced  [x] Background Noise.");
-		/* generate a white noise */
+
 		for (i = 0; i < CHUNK_SIZE; ++i) {
 			/*
 			 * Uniform distribution (similar to matlab's rand()). Generate
 			 * random values between -1 and 1 (*[max-min]+min).
 			 */
 			output[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
-			output[i] *= 0.0005f;
-			/* TODO: store some background noise in memory */
+
+			/* limit saturation */
+			output[i] *= 0.002f;
+
+			/* (TODO: store some background noise in memory) */
 		}
 		return;
 	}
@@ -237,14 +244,10 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	}
 
 	/* filter the excitation */
-	/* liquid dsp: iirfilt_rrrf loopfilter = iirfilt_rrrf_create(b,3,a,3); */
-	/* matlab : filter(1, coeffs, ...), y = filter(b,a,x) */
-
 	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
 
-	for (i = 0; i < CHUNK_SIZE; ++i) {
+	for (i = 0; i < CHUNK_SIZE; ++i)
 		iirfilt_rrrf_execute(f, excitation[i], &data[i]);
-	}
 
 	iirfilt_rrrf_destroy(f);
 
@@ -252,5 +255,4 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
-
 }
