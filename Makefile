@@ -6,7 +6,11 @@ OBJ = $(SRC:.c=.o)
 
 BIN = salut
 
-all: $(BIN)
+# DEV ONLY
+all: 
+	make clean && make $(BIN) -j4
+
+# all: $(BIN)
 
 $(BIN): $(OBJ)
 	@echo "LD $@"
