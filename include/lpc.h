@@ -32,7 +32,7 @@ typedef struct {
 
 typedef struct {
 	/* left and right chunks */
-	LpcChunk chunks[2];
+	LpcChunk chunks[NUM_CHANNELS];
 } LpcData;
 
 LpcChunk lpc_encode(float *input);

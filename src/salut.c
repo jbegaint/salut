@@ -36,6 +36,51 @@ static void on_quit(void)
 	fprintf(stderr, "Exiting...\n");
 }
 
+static int serialize_data(LpcData *data, char *buf)
+{
+	int i, sz, pitch;
+	int offset = 0;
+
+	for (i = 0; i < NUM_CHANNELS; ++i) {
+		pitch = data->chunks[i].pitch;
+
+		memcpy(buf + offset, &pitch, sizeof(pitch));
+		offset += sizeof(pitch);
+
+		if (pitch > 0) {
+			sz = N_COEFFS * sizeof(float);
+			memcpy(buf + offset, data->chunks[i].coefficients, sz);
+			offset += sz;
+		}
+	}
+
+	return offset;
+}
+
+static int deserialize_data(char *buf, LpcData *data)
+{
+	int i, sz, pitch;
+	int offset = 0;
+
+	for (i = 0; i < NUM_CHANNELS; ++i) {
+
+		/* retrieve pitch */
+		memcpy(&pitch, buf + offset, sizeof(int));
+		data->chunks[i].pitch = pitch;
+
+		offset += sizeof(int);
+
+		if (pitch > 0) {
+			/* retrieve coefficients */
+			sz = N_COEFFS * sizeof(float);
+			memcpy(data->chunks[i].coefficients, buf + offset, sz);
+			offset += sz;
+		}
+	}
+
+	return offset;
+}
+
 static void *handle_con_refused(void)
 {
 	if (errno == ECONNREFUSED) {
@@ -167,8 +212,13 @@ static void *send_thread_routine(void *arg)
 		out.chunks[0] = lpc_encode(data[1]);
 		out.chunks[1] = lpc_encode(data[1]);
 
+		/* serialize data */
+		char sendbuf[sizeof(LpcData)];
+
+		int sz = serialize_data(&out, sendbuf);
+
 		/* send data */
-		if (send(s, &out, sizeof(LpcData), 0) == -1)
+		if (send(s, sendbuf, sz, 0) == -1)
 			return handle_con_refused();
 	}
 
@@ -202,10 +252,14 @@ static void *read_thread_routine(void *arg)
 
 			LpcData in;
 			float data[2][CHUNK_SIZE];
+			char recvbuf[sizeof(LpcData)];
 
-			/* read received data */
-			if (recv(s, &in, sizeof(LpcData), 0) == -1)
+			/* read incoming data */
+			if (recv(s, recvbuf, sizeof(recvbuf), 0) == -1)
 				return handle_con_refused();
+
+			/* deserialize incoming data */
+			deserialize_data(recvbuf, &in);
 
 			/* lpc decoding */
 			lpc_decode(&in.chunks[0], data[0]);

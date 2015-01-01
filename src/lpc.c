@@ -11,6 +11,8 @@
 
 #define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
 
+#define fprintf(x,...) (void)(x)
+
 void hanning(const float *input, const size_t len, float *output)
 {
 	unsigned int i;
