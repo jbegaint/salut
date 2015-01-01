@@ -13,7 +13,7 @@
 
 #define fprintf(x,...) (void)(x)
 
-void hanning(const float *input, const size_t len, float *output)
+static void hanning(const float *input, const size_t len, float *output)
 {
 	unsigned int i;
 	float coef;
@@ -24,7 +24,7 @@ void hanning(const float *input, const size_t len, float *output)
 	}
 }
 
-int get_pitch_by_autocorr(float *input, const size_t len)
+static int get_pitch_by_autocorr(float *input, const size_t len)
 {
 	int pitch = -1;
 	unsigned int i, k;
@@ -59,12 +59,7 @@ int get_pitch_by_autocorr(float *input, const size_t len)
 	return pitch;
 }
 
-int get_pitch(float *input, const size_t len)
-{
-	return get_pitch_by_autocorr(input, len);
-}
-
-void lpc_pre_emphasis_filter(float *input, float *output)
+static void lpc_pre_emphasis_filter(float *input, float *output)
 {
 	unsigned int i;
 
@@ -79,7 +74,7 @@ void lpc_pre_emphasis_filter(float *input, float *output)
 	iirfilt_rrrf_destroy(f);
 }
 
-void lpc_de_emphasis_filter(float *input, float *output)
+static void lpc_de_emphasis_filter(float *input, float *output)
 {
 	unsigned int i;
 
@@ -121,7 +116,7 @@ LpcChunk lpc_encode(float *input)
 	lpc_pre_emphasis_filter(input, data);
 
 	/* compute pitch (autocorr FTW) */
-	const int pitch = get_pitch(input, CHUNK_SIZE);
+	const int pitch = get_pitch_by_autocorr(input, CHUNK_SIZE);
 
 	if (pitch == -1) {
 		/* background noise, discard */
@@ -263,3 +258,51 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
 }
+
+int lpc_serialize_data(LpcData *data, char *buf)
+{
+	int i, sz, pitch;
+	int offset = 0;
+
+	for (i = 0; i < NUM_CHANNELS; ++i) {
+		/* write pitch */
+		pitch = data->chunks[i].pitch;
+		sz = sizeof(pitch);
+		memcpy(buf + offset, &pitch, sz);
+		offset += sz;
+
+		/* write coefficients ? */
+		if (pitch >= 0) {
+			sz = N_COEFFS * sizeof(float);
+			memcpy(buf + offset, data->chunks[i].coefficients, sz);
+			offset += sz;
+		}
+	}
+
+	return offset;
+}
+
+int lpc_deserialize_data(char *buf, LpcData *data)
+{
+	int i, sz, pitch;
+	int offset = 0;
+
+	for (i = 0; i < NUM_CHANNELS; ++i) {
+
+		/* retrieve pitch */
+		sz = sizeof(int);
+		memcpy(&pitch, buf + offset, sz);
+		data->chunks[i].pitch = pitch;
+		offset += sz;
+
+		/* retrieve coefficients ? */
+		if (pitch >= 0) {
+			sz = N_COEFFS * sizeof(float);
+			memcpy(data->chunks[i].coefficients, buf + offset, sz);
+			offset += sz;
+		}
+	}
+
+	return offset;
+}
+
