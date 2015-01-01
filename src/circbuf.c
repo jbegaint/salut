@@ -15,10 +15,10 @@ CircularBuffer *cb_init(int size, int elt_size)
 	/* fill struct info */
 	cb->size = size;
 	cb->elt_size = elt_size;
-	cb->start = 0;
 
 	/* allocate memory */
 	cb->data = calloc(cb->elt_size * size, sizeof(char));
+	handle_alloc_error(cb->data);
 
 	/* init the semaphore */
 	if (sem_init(&cb->sem, 0, 10) == -1)
