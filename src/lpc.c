@@ -19,7 +19,7 @@ void hanning(const float *input, const size_t len, float *output)
 	float coef;
 
 	for (i = 0; i < len; ++i) {
-		coef = 0.5 - 0.5 * cos(2.f * M_PI * i / len);
+		coef = 0.5f - 0.5f * cos(2.f * M_PI * i / len);
 		*output++ = *input++ * coef;
 	}
 }
@@ -99,9 +99,6 @@ LpcChunk lpc_encode(float *input)
 	LpcChunk lpc_chunk;
 	float data[CHUNK_SIZE];
 
-	/* zero struct */
-	CLEAR(lpc_chunk);
-
 	/* compute chunk energy */
 	float e = 0, val;
 
@@ -119,9 +116,6 @@ LpcChunk lpc_encode(float *input)
 		lpc_chunk.pitch = -1;
 		return lpc_chunk;
 	}
-
-	/* hanning apodization */
-	hanning(input, CHUNK_SIZE, input);
 
 	/* pre emphasis filter */
 	lpc_pre_emphasis_filter(input, data);
@@ -167,9 +161,6 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	const float *coeffs = lpc_chunk->coefficients;
 	const int pitch = lpc_chunk->pitch;
 
-	/* hello darkness my old friend... */
-	memset(output, SAMPLE_SILENCE, sizeof(excitation));
-
 	/* compute the excitation */
 	if (pitch > 0) {
 		fprintf(stderr, "\r [x] Voiced  [ ] Unvoiced  [ ] Background Noise.");
@@ -180,7 +171,6 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
 
 			/* limit saturation */
-			/* excitation[i] *= 0.01f; */
 			excitation[i] *= 0.005f;
 		}
 	}
@@ -198,7 +188,6 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
 
 			/* limit saturation */
-			/* excitation[i] *= 0.01f; */
 			excitation[i] *= 0.005f;
 		}
 	}
@@ -206,6 +195,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		fprintf(stderr, "\r [ ] Voiced  [ ] Unvoiced  [x] Background Noise.");
 
 		for (i = 0; i < CHUNK_SIZE; ++i) {
+
 			/*
 			 * Uniform distribution (similar to matlab's rand()). Generate
 			 * random values between -1 and 1 (*[max-min]+min).
@@ -245,7 +235,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		c++;
 	} while ((!stable) && (c < 20));
 
-	if (c == 20) {
+	if (!stable) {
 		/* discard these coefficients */
 		memset(a_lpc, 0, sizeof(a_lpc));
 	}
@@ -258,6 +248,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	iirfilt_rrrf_destroy(f);
 
+	/* apodization */
 	hanning(data, CHUNK_SIZE, data);
 
 	/* overlapping */
