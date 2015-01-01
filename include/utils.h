@@ -5,6 +5,8 @@
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
+#define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
+
 /* usefull math macros (from kernel.h) */
 #define MIN(x, y) __extension__({               \
 		typeof(x) _min1 = (x);                  \

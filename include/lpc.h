@@ -41,7 +41,9 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output);
 void my_liquid_lpc(float * _x, unsigned int _n, unsigned int _p, float * _a,
 		float * _g);
 
-int lpc_serialize_data(LpcData *data, char *buf);
-int lpc_deserialize_data(char *buf, LpcData *data);
+int lpc_data_serialize(LpcData *data, char *buf);
+int lpc_data_deserialize(char *buf, LpcData *data);
+
+void lpc_data_decode(LpcData *lpc_data, float **data);
 
 #endif

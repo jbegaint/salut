@@ -9,8 +9,6 @@
 #include "lpc.h"
 #include "utils.h"
 
-#define handle_alloc_error(x) if (!x) die("Could not allocate memory.\n")
-
 #define fprintf(x,...) (void)(x)
 
 static void hanning(const float *input, const size_t len, float *output)
@@ -259,7 +257,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	lpc_de_emphasis_filter(data, output);
 }
 
-int lpc_serialize_data(LpcData *data, char *buf)
+int lpc_data_serialize(LpcData *data, char *buf)
 {
 	int i, sz, pitch;
 	int offset = 0;
@@ -282,7 +280,7 @@ int lpc_serialize_data(LpcData *data, char *buf)
 	return offset;
 }
 
-int lpc_deserialize_data(char *buf, LpcData *data)
+int lpc_data_deserialize(char *buf, LpcData *data)
 {
 	int i, sz, pitch;
 	int offset = 0;
@@ -306,3 +304,8 @@ int lpc_deserialize_data(char *buf, LpcData *data)
 	return offset;
 }
 
+void lpc_data_decode(LpcData *lpc_data, float **data)
+{
+	for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
+		lpc_decode(&lpc_data->chunks[i], data[i]);
+}

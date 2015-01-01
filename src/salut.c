@@ -170,7 +170,7 @@ static void *send_thread_routine(void *arg)
 		/* serialize data */
 		char sendbuf[sizeof(LpcData)];
 
-		const int sz = lpc_serialize_data(&out, sendbuf);
+		const int sz = lpc_data_serialize(&out, sendbuf);
 
 		/* send data */
 		if (send(s, sendbuf, sz, 0) == -1)
@@ -186,7 +186,20 @@ static void *read_thread_routine(void *arg)
 	float *wptr = NULL;
 	int s = *ctx->socket_fd;
 	int sel;
+	float **data = NULL;
 
+	/* allocate memory */
+	data = calloc(NUM_CHANNELS, sizeof(*data));
+	handle_alloc_error(data);
+
+	*data = calloc(NUM_CHANNELS * CHUNK_SIZE, sizeof(**data));
+	handle_alloc_error(*data);
+
+	for (int i = 1; i < NUM_CHANNELS; ++i) {
+		data[i] = data[i - 1] + CHUNK_SIZE;
+	}
+
+	/* do stuff */
 	while (*ctx->running) {
 		fd_set fd;
 		FD_ZERO(&fd);
@@ -209,27 +222,25 @@ static void *read_thread_routine(void *arg)
 		if (FD_ISSET(s, &fd)) {
 
 			LpcData in;
-			float data[2][CHUNK_SIZE];
 			char recvbuf[sizeof(LpcData)];
 
 			/* read incoming data */
 			if (recv(s, recvbuf, sizeof(recvbuf), 0) == -1)
 				return handle_con_refused();
 
-			/* deserialize incoming data */
-			lpc_deserialize_data(recvbuf, &in);
+			/* decode data */
+			lpc_data_deserialize(recvbuf, &in);
+			lpc_data_decode(&in, data);
 
-			/* lpc decoding */
-			lpc_decode(&in.chunks[0], data[0]);
-			lpc_decode(&in.chunks[1], data[1]);
-
+			/* get a pointer to a writable zone in the circular buffer */
 			wptr = (float *) cb_get_wptr(ctx->cb_in);
 
-			/* packed data */
+			/* write data (interleaved) */
 			for (int i = 0; i < CHUNK_SIZE; ++i) {
 				/* left and right */
-				*wptr++ = data[0][i];
-				*wptr++ = data[1][i];
+				for (int j = 0; j < NUM_CHANNELS; ++j) {
+					*wptr++ = data[j][i];
+				}
 			}
 
 			/* all done, data is written */
@@ -242,6 +253,10 @@ static void *read_thread_routine(void *arg)
 		/* sem_getvalue(&ctx->cb_out->sem, &vout); */
 		/* fprintf(stderr, "\rSem values: in [%d] out [%d]", vin, vout); */
 	}
+
+	/* clean up */
+	free(*data);
+	free(data);
 
 	return NULL;
 }
