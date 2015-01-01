@@ -44,7 +44,6 @@ static void *handle_con_refused(void)
 
 		/* let's exit */
 		on_quit();
-
 	}
 	else {
 		/* something terrible happend */
@@ -85,9 +84,9 @@ static int playCallback(const void *input, void *output,
 	rptr = (float *) cb_get_rptr(ctx->cb_in);
 
 	for (i = 0; i < frames_count; ++i) {
-		/* left and right */
-		*wptr++ = *rptr++;
-		*wptr++ = *rptr++;
+		for (int j = 0; j < NUM_CHANNELS; ++j) {
+			*wptr++ = *rptr++;
+		}
 	}
 
 	return paContinue;
@@ -118,16 +117,16 @@ static int recordCallback(const void *input, void *output,
 
 	if (!input) {
 		for (i = 0; i < frames_count; ++i) {
-			/* left and right */
-			*wptr++ = SAMPLE_SILENCE;
-			*wptr++ = SAMPLE_SILENCE;
+			for (int j = 0; j < NUM_CHANNELS; ++j) {
+				*wptr++ = SAMPLE_SILENCE;
+			}
 		}
 	}
 	else {
 		for (i = 0; i < frames_count; ++i) {
-			/* left and right */
-			*wptr++ = *rptr++;
-			*wptr++ = *rptr++;
+			for (int j = 0; j < NUM_CHANNELS; ++j) {
+				*wptr++ = *rptr++;
+			}
 		}
 	}
 
