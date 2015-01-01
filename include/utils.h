@@ -30,4 +30,7 @@
 void die(const char *s, ...);
 void errno_die(void);
 
+float **allocate_2d_arrayf(int n, int m);
+void free_2d_arrayf(float **data);
+
 #endif

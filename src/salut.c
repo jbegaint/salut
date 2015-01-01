@@ -140,8 +140,14 @@ static int recordCallback(const void *input, void *output,
 static void *send_thread_routine(void *arg)
 {
 	Context *ctx = (Context *) arg;
+	LpcData out;
+	char sendbuf[sizeof(LpcData)];
+	float **data;
 	float *rptr = NULL;
 	int s = *ctx->socket_fd;
+	int sz;
+
+	data = allocate_2d_arrayf(NUM_CHANNELS, CHUNK_SIZE);
 
 	while (*ctx->running) {
 
@@ -153,29 +159,27 @@ static void *send_thread_routine(void *arg)
 		if (!*ctx->running)
 			break;
 
-		/* unpacked data */
-		float data[2][CHUNK_SIZE];
-
+		/* get interleaved data */
 		for (int i = 0; i < CHUNK_SIZE; ++i) {
 			/* left and right */
-			data[0][i] = *rptr++;
-			data[1][i] = *rptr++;
+			for (int j = 0; j < NUM_CHANNELS; ++j) {
+				data[j][i] = *rptr++;
+			}
 		}
 
 		/* LPC encoding */
-		LpcData out;
-		out.chunks[0] = lpc_encode(data[1]);
-		out.chunks[1] = lpc_encode(data[1]);
+		lpc_data_encode(data, &out);
 
 		/* serialize data */
-		char sendbuf[sizeof(LpcData)];
-
-		const int sz = lpc_data_serialize(&out, sendbuf);
+		sz = lpc_data_serialize(&out, sendbuf);
 
 		/* send data */
 		if (send(s, sendbuf, sz, 0) == -1)
 			return handle_con_refused();
 	}
+
+	/* clean up */
+	free_2d_arrayf(data);
 
 	return NULL;
 }
@@ -183,21 +187,14 @@ static void *send_thread_routine(void *arg)
 static void *read_thread_routine(void *arg)
 {
 	Context *ctx = (Context *) arg;
+	LpcData in;
+	char recvbuf[sizeof(LpcData)];
+	float **data;
 	float *wptr = NULL;
 	int s = *ctx->socket_fd;
 	int sel;
-	float **data = NULL;
 
-	/* allocate memory */
-	data = calloc(NUM_CHANNELS, sizeof(*data));
-	handle_alloc_error(data);
-
-	*data = calloc(NUM_CHANNELS * CHUNK_SIZE, sizeof(**data));
-	handle_alloc_error(*data);
-
-	for (int i = 1; i < NUM_CHANNELS; ++i) {
-		data[i] = data[i - 1] + CHUNK_SIZE;
-	}
+	data = allocate_2d_arrayf(NUM_CHANNELS, CHUNK_SIZE);
 
 	/* do stuff */
 	while (*ctx->running) {
@@ -220,9 +217,6 @@ static void *read_thread_routine(void *arg)
 			errno_die();
 
 		if (FD_ISSET(s, &fd)) {
-
-			LpcData in;
-			char recvbuf[sizeof(LpcData)];
 
 			/* read incoming data */
 			if (recv(s, recvbuf, sizeof(recvbuf), 0) == -1)
@@ -255,8 +249,7 @@ static void *read_thread_routine(void *arg)
 	}
 
 	/* clean up */
-	free(*data);
-	free(data);
+	free_2d_arrayf(data);
 
 	return NULL;
 }

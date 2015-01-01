@@ -306,6 +306,12 @@ int lpc_data_deserialize(char *buf, LpcData *data)
 
 void lpc_data_decode(LpcData *lpc_data, float **data)
 {
-	for (unsigned int i = 0; i < NUM_CHANNELS; ++i)
+	for (int i = 0; i < NUM_CHANNELS; ++i)
 		lpc_decode(&lpc_data->chunks[i], data[i]);
+}
+
+void lpc_data_encode(float **data, LpcData *lpc_data)
+{
+	for (int i = 0; i < NUM_CHANNELS; ++i)
+		lpc_data->chunks[i] = lpc_encode(data[i]);
 }
