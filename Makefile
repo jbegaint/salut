@@ -7,7 +7,7 @@ OBJ = $(SRC:.c=.o)
 BIN = salut
 
 # DEV ONLY
-all: 
+all:
 	make clean && make $(BIN) -j4
 
 # all: $(BIN)
