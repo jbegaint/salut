@@ -263,9 +263,11 @@ int lpc_data_serialize(LpcData *data, char *buf)
 	int offset = 0;
 
 	for (i = 0; i < NUM_CHANNELS; ++i) {
-		/* write pitch */
+
 		pitch = data->chunks[i].pitch;
 		sz = sizeof(pitch);
+
+		/* write pitch */
 		memcpy(buf + offset, &pitch, sz);
 		offset += sz;
 
@@ -287,11 +289,13 @@ int lpc_data_deserialize(char *buf, LpcData *data)
 
 	for (i = 0; i < NUM_CHANNELS; ++i) {
 
-		/* retrieve pitch */
 		sz = sizeof(int);
+
+		/* retrieve pitch */
 		memcpy(&pitch, buf + offset, sz);
-		data->chunks[i].pitch = pitch;
 		offset += sz;
+
+		data->chunks[i].pitch = pitch;
 
 		/* retrieve coefficients ? */
 		if (pitch >= 0) {

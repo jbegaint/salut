@@ -12,15 +12,12 @@ CircularBuffer *cb_init(int size, int elt_size)
 {
 	CircularBuffer *cb = calloc(1, sizeof(*cb));
 
-	/* fill struct info */
 	cb->size = size;
 	cb->elt_size = elt_size;
 
-	/* allocate memory */
 	cb->data = calloc(cb->elt_size * size, sizeof(char));
 	handle_alloc_error(cb->data);
 
-	/* init the semaphore */
 	if (sem_init(&cb->sem, 0, 10) == -1)
 		errno_die();
 
@@ -32,7 +29,6 @@ void cb_free(CircularBuffer *cb)
 	if (sem_destroy(&cb->sem) == -1)
 		errno_die();
 
-	/* free memory */
 	free(cb->data);
 }
 
@@ -53,10 +49,12 @@ char *cb_try_get_rptr(CircularBuffer *cb)
 	if (clock_gettime(CLOCK_REALTIME, &timeout) == 1)
 		errno_die();
 
-	/* calculate relatime interval for the timeout */
-	timeout.tv_sec += 1;
+	/*
+	 * Compute the timeout, as `sem_timedwait` takes a absolute time since the
+	 * Epoch as argument.
+	 */
 
-	/* TODO: decrease timeout value */
+	timeout.tv_sec += 1;
 
 	if (sem_timedwait(&cb->sem, &timeout) == -1) {
 		if (errno == ETIMEDOUT)
@@ -77,11 +75,10 @@ char *cb_get_wptr(CircularBuffer *cb)
 	if (sem_getvalue(&cb->sem, &count) == -1)
 		errno_die();
 
-	/* compute buffer end */
 	end = (cb->start + count) % cb->size;
 
+	/* if cb is full, then overwrite */
 	if (count == cb->size) {
-		/* cb is full, overwrite */
 		cb->start = (cb->start + 1) % cb->size;
 	}
 
