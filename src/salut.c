@@ -42,11 +42,13 @@ static int serialize_data(LpcData *data, char *buf)
 	int offset = 0;
 
 	for (i = 0; i < NUM_CHANNELS; ++i) {
+		/* write pitch */
 		pitch = data->chunks[i].pitch;
+		sz = sizeof(pitch);
+		memcpy(buf + offset, &pitch, sz);
+		offset += sz;
 
-		memcpy(buf + offset, &pitch, sizeof(pitch));
-		offset += sizeof(pitch);
-
+		/* write coefficients ? */
 		if (pitch >= 0) {
 			sz = N_COEFFS * sizeof(float);
 			memcpy(buf + offset, data->chunks[i].coefficients, sz);
@@ -65,13 +67,13 @@ static int deserialize_data(char *buf, LpcData *data)
 	for (i = 0; i < NUM_CHANNELS; ++i) {
 
 		/* retrieve pitch */
-		memcpy(&pitch, buf + offset, sizeof(int));
+		sz = sizeof(int);
+		memcpy(&pitch, buf + offset, sz);
 		data->chunks[i].pitch = pitch;
+		offset += sz;
 
-		offset += sizeof(int);
-
+		/* retrieve coefficients ? */
 		if (pitch >= 0) {
-			/* retrieve coefficients */
 			sz = N_COEFFS * sizeof(float);
 			memcpy(data->chunks[i].coefficients, buf + offset, sz);
 			offset += sz;
@@ -85,7 +87,7 @@ static void *handle_con_refused(void)
 {
 	if (errno == ECONNREFUSED) {
 		/* peer disconnected */
-		fprintf(stderr, "Could not connect to peer.\n");
+		fprintf(stderr, "Peer disconnected.\n");
 
 		/* let's exit */
 		on_quit();
@@ -244,6 +246,9 @@ static void *read_thread_routine(void *arg)
 		do {
 			sel = select(s + 1, &fd, NULL, NULL, &tv);
 		} while ((sel == -1) && (errno == EINTR) && *ctx->running);
+
+		if (!*ctx->running)
+			break;
 
 		if (sel == -1)
 			errno_die();
