@@ -109,7 +109,10 @@ LpcChunk lpc_encode(float *input)
 	}
 
 	/* heuristic value (FIXME ?) */
-	if (e < 0.2f) {
+	/* float thresh = 0.2f * 256 / (float) CHUNK_SIZE */
+	const float thresh = 0.4f;
+
+	if (e < thresh) {
 		/* background noise */
 		lpc_chunk.pitch = -1;
 		return lpc_chunk;
@@ -175,7 +178,8 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
 
 			/* limit saturation */
-			excitation[i] *= 0.01f;
+			/* excitation[i] *= 0.01f; */
+			excitation[i] *= 0.005f;
 		}
 	}
 	else if (pitch == 0) {
@@ -192,7 +196,8 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
 
 			/* limit saturation */
-			excitation[i] *= 0.01f;
+			/* excitation[i] *= 0.01f; */
+			excitation[i] *= 0.005f;
 		}
 	}
 	else {
@@ -251,7 +256,16 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 
 	iirfilt_rrrf_destroy(f);
 
-	hanning(output, CHUNK_SIZE, output);
+	hanning(data, CHUNK_SIZE, data);
+
+	/* overlapping */
+	static float prev_data[CHUNK_SIZE / 2];
+
+	for (i = 0; i < CHUNK_SIZE / 2; ++i)
+		data[i] = data[i] + prev_data[i];
+
+	/* save current */
+	memcpy(prev_data, data + CHUNK_SIZE / 2, sizeof(prev_data));
 
 	/* de-emphasis filter */
 	lpc_de_emphasis_filter(data, output);
