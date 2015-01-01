@@ -47,7 +47,7 @@ static int serialize_data(LpcData *data, char *buf)
 		memcpy(buf + offset, &pitch, sizeof(pitch));
 		offset += sizeof(pitch);
 
-		if (pitch > 0) {
+		if (pitch >= 0) {
 			sz = N_COEFFS * sizeof(float);
 			memcpy(buf + offset, data->chunks[i].coefficients, sz);
 			offset += sz;
@@ -70,7 +70,7 @@ static int deserialize_data(char *buf, LpcData *data)
 
 		offset += sizeof(int);
 
-		if (pitch > 0) {
+		if (pitch >= 0) {
 			/* retrieve coefficients */
 			sz = N_COEFFS * sizeof(float);
 			memcpy(data->chunks[i].coefficients, buf + offset, sz);
