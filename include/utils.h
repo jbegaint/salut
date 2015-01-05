@@ -11,7 +11,7 @@
 #define MIN(x, y) __extension__({               \
 		typeof(x) _min1 = (x);                  \
 		typeof(y) _min2 = (y);                  \
-		_min1 < _min2 ? _min1 : _min2; 			\
+		_min1 < _min2 ? _min1 : _min2;			\
 		})
 
 #define MAX(x, y) __extension__({               \

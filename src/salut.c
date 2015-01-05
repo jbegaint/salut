@@ -27,6 +27,8 @@
 
 #define handle_pa_error(err) if (err != paNoError) goto done
 
+Options options = {0.4f, 64};
+
 static int running = 1;
 
 static void on_quit(void)

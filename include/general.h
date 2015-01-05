@@ -18,4 +18,12 @@
 /* #define BUF_SIZE 1024 */
 #endif
 
+typedef struct {
+	/* threshold for background noise detection */
+	float energy_thresh;
+
+	/* number of lpc coefficients */
+	int n_coeffs;
+} Options;
+
 #endif

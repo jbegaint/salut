@@ -11,6 +11,8 @@
 
 #define fprintf(x,...) (void)(x)
 
+extern Options options;
+
 static void hanning(const float *input, const size_t len, float *output)
 {
 	unsigned int i;
@@ -61,7 +63,7 @@ static void lpc_pre_emphasis_filter(float *input, float *output)
 {
 	unsigned int i;
 
-	float a[2]= {1.f, 1.f};
+	float a[2] = {1.f, 1.f};
 	float b[2] = {1.f, -0.9f};
 
 	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
@@ -77,7 +79,7 @@ static void lpc_de_emphasis_filter(float *input, float *output)
 	unsigned int i;
 
 	float a[2] = {1.f, -0.9f};
-	float b[2]= {1.f, 1.f};
+	float b[2] = {1.f, 1.f};
 
 	iirfilt_rrrf f = iirfilt_rrrf_create(b, 2, a, 2);
 
@@ -100,12 +102,8 @@ LpcChunk lpc_encode(float *input)
 		e = MAX(e, val);
 	}
 
-	/* heuristic value (FIXME ?) */
-	/* float thresh = 0.2f * 256 / (float) CHUNK_SIZE */
-	const float thresh = 0.4f;
-
-	if (e < thresh) {
-		/* background noise */
+	/* background noise detection */
+	if (e < options.energy_thresh) {
 		lpc_chunk.pitch = -1;
 		return lpc_chunk;
 	}

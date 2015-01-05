@@ -25,7 +25,7 @@ typedef struct {
 	 * 	- 0 if non voiced,
 	 * 	- -1 if noise/silence.
 	 */
-	int pitch;
+	short pitch;
 	float coefficients[N_COEFFS]; /* lpc coefficients */
 } LpcChunk;
 
