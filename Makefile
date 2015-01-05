@@ -1,5 +1,8 @@
 CFLAGS = -std=gnu99 -Wall -Wextra -Wshadow -pedantic -Iinclude -g
+CFLAGS += `pkg-config gtk+-3.0 --cflags`
+
 LDFLAGS = -lportaudio -lpthread -lm -lliquid
+LDFLAGS += `pkg-config gtk+-3.0 --libs`
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)

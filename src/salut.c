@@ -16,27 +16,24 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <gtk/gtk.h>
+
 #include "circbuf.h"
+#include "callbacks.h"
 #include "context.h"
 #include "general.h"
 #include "lpc.h"
 #include "udp.h"
 #include "utils.h"
+#include "ui.h"
 
 #define MAX_LEN 256
 
 #define handle_pa_error(err) if (err != paNoError) goto done
 
+/* Global variables... */
 Options options = {0.4f, 64};
-
-static int running = 1;
-
-static void on_quit(void)
-{
-	running = 0;
-
-	fprintf(stderr, "Exiting...\n");
-}
+int running = 1;
 
 static void *handle_con_refused(void)
 {
@@ -255,6 +252,19 @@ static void *read_thread_routine(void *arg)
 	return NULL;
 }
 
+static void *ui_thread_routine(void *arg)
+{
+	/* gtk_init(&argc, &argv); */
+	gtk_init(NULL, NULL);
+
+	if (init_ui(arg) != 0)
+		die("Could not initialize the ui.\n");
+
+	gtk_main();
+
+	return NULL;
+}
+
 int main(int argc, char **argv)
 {
 	PaError err = paNoError;
@@ -262,7 +272,7 @@ int main(int argc, char **argv)
 	PaStream *outputStream;
 
 	Context *ctx;
-	pthread_t read_thread, send_thread;
+	pthread_t read_thread, send_thread, ui_thread;
 
 	int rc, socket_fd;
 	struct sockaddr_in myaddr;
@@ -389,6 +399,10 @@ int main(int argc, char **argv)
 	if (pthread_create(&send_thread, NULL, send_thread_routine, ctx) != 0)
 		errno_die();
 
+	/* init ui */
+	if (pthread_create(&ui_thread, NULL, ui_thread_routine, &options) != 0)
+		errno_die();
+
 	/* FIXME */
 	while ((err = Pa_IsStreamActive(inputStream)
 				& Pa_IsStreamActive(outputStream)) == 1) {
@@ -411,6 +425,9 @@ done:
 		errno_die();
 
 	if (pthread_join(send_thread, NULL) != 0)
+		errno_die();
+
+	if (pthread_join(ui_thread, NULL) != 0)
 		errno_die();
 
 	/* clean up */
