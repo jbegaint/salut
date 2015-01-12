@@ -28,7 +28,7 @@ static int get_pitch_by_autocorr(float *input, const size_t len)
 {
 	int pitch = -1;
 	unsigned int i, k;
-	float sum, old_sum, thresh;
+	float sum = 0, old_sum, thresh;
 
 	int state = 1;
 
