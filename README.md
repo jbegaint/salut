@@ -6,8 +6,8 @@ Description
 
 * `duplex` duplex LPC encoding/ decoding demo
 
-* `salut` VOIP program with the previous LPC codec, relies on UNIX sockets for
- the network and the Gtk library for the basic GUI.
+* `salut` simple VOIP program based on the previous LPC codec, relies on UNIX
+ sockets for the network and the GTK library for the basic GUI.
 
 Dependencies
 ------------
