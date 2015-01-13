@@ -11,6 +11,8 @@ Description
 * `salut` simple VOIP program based on the previous LPC codec, relies on UNIX
  sockets for the network and the GTK library for the basic GUI.
 
+* some PortAudio demo programs can also be found in the `tests/` directory
+
 Dependencies
 ------------
 
@@ -23,6 +25,6 @@ Compilation
 
 * use `make` to compile both binaries or `make target` for a specific target
 
-Disclaimer: both programs have only been tested on GNU/Linux distributions
+*_Disclaimer_*: both programs have only been tested on GNU/Linux distributions
 (Arch Linux and Fedora 21) and should not be expected to run (or even build) on
 other platforms.
