@@ -24,7 +24,7 @@ void errno_die(void)
 
 float **allocate_2d_arrayf(int n, int m)
 {
-	float **data;
+	float **data = NULL;
 
 	/* allocate memory */
 	data = calloc(n, sizeof(*data));

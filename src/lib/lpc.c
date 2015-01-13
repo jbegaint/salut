@@ -9,7 +9,7 @@
 #include "lpc.h"
 #include "utils.h"
 
-#define fprintf(x,...) (void)(x)
+/* #define fprintf(x,...) (void)(x) */
 
 extern Options options;
 
@@ -35,7 +35,7 @@ static int get_pitch_by_autocorr(float *input, const size_t len)
 	for ( k = 0; k < len; ++k) {
 		sum += input[k] * input[k];
 	}
-	thresh = 0.2f * sum;
+	thresh = 0.3f * sum;
 
 	for (i = 1; i < len; ++i) {
 		old_sum = sum;
@@ -152,52 +152,41 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	const float *coeffs = lpc_chunk->coefficients;
 	const int pitch = lpc_chunk->pitch;
 
+	/* basic "interface" */
+	fprintf(stderr, "\r [%s] Voiced  [%s] Unvoiced  [%s] Background Noise",
+			(pitch > 0) ? "x" : " ",
+			(pitch == 0) ? "x" : " ",
+			(pitch == -1) ? "x" : " ");
+
 	/* compute the excitation */
 	if (pitch > 0) {
-		fprintf(stderr, "\r [x] Voiced  [ ] Unvoiced  [ ] Background Noise.");
-
 		/* if voiced, generate an impulsion train */
-		for (i = 0; i < CHUNK_SIZE; ++i) {
-
-			excitation[i] = ((i % pitch) == 0) ? sqrt(pitch) : 0;
-
-			/* limit saturation */
-			excitation[i] *= 0.005f;
-		}
+		for (i = 0; i < CHUNK_SIZE; ++i)
+			excitation[i] = ((i % pitch) == 0) ? 1 : 0;
 	}
 	else if (pitch == 0) {
-		fprintf(stderr, "\r [ ] Voiced  [x] Unvoiced  [ ] Background Noise.");
 
-		/* generate a white noise */
-		for (i = 0; i < CHUNK_SIZE; ++i) {
+		/*
+		 * Uniform distribution (similar to matlab's rand()). Generate
+		 * random values between -1 and 1 (*[max-min]+min).
+		 */
 
-			/*
-			 * Uniform distribution (similar to matlab's rand()). Generate
-			 * random values between -1 and 1 (*[max-min]+min).
-			 */
-
+		for (i = 0; i < CHUNK_SIZE; ++i)
 			excitation[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
-
-			/* limit saturation */
-			excitation[i] *= 0.005f;
-		}
 	}
 	else {
-		fprintf(stderr, "\r [ ] Voiced  [ ] Unvoiced  [x] Background Noise.");
 
-		for (i = 0; i < CHUNK_SIZE; ++i) {
+		/*
+		 * Uniform distribution (similar to matlab's rand()). Generate
+		 * random values between -1 and 1 (*[max-min]+min).
+		 */
 
-			/*
-			 * Uniform distribution (similar to matlab's rand()). Generate
-			 * random values between -1 and 1 (*[max-min]+min).
-			 */
-			output[i] = ((float) rand() / (float) RAND_MAX) * 2 - 1;
+		/* (TODO: store some background noise in memory ?) */
 
-			/* limit saturation */
-			output[i] *= 0.002f;
+		for (i = 0; i < CHUNK_SIZE; ++i)
+			output[i] = (((float) rand() / (float) RAND_MAX) * 2 - 1) * 0.002f;
 
-			/* (TODO: store some background noise in memory) */
-		}
+		/* all done */
 		return;
 	}
 
@@ -226,10 +215,9 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 		c++;
 	} while ((!stable) && (c < 20));
 
-	if (!stable) {
-		/* discard these coefficients */
-		memset(a_lpc, 0, sizeof(a_lpc));
-	}
+	/* discard these coefficients ? */
+	if (!stable)
+		return;
 
 	/* filter the excitation */
 	iirfilt_rrrf f = iirfilt_rrrf_create(b_lpc, N_COEFFS, a_lpc, N_COEFFS);
@@ -248,7 +236,7 @@ void lpc_decode(LpcChunk *lpc_chunk, float *output)
 	for (i = 0; i < CHUNK_SIZE / 2; ++i)
 		data[i] = data[i] + prev_data[i];
 
-	/* save current */
+	/* save current for next run */
 	memcpy(prev_data, data + CHUNK_SIZE / 2, sizeof(prev_data));
 
 	/* de-emphasis filter */

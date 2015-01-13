@@ -4,18 +4,18 @@ CFLAGS += `pkg-config gtk+-3.0 --cflags`
 LDFLAGS = -lportaudio -lpthread -lm -lliquid
 LDFLAGS += `pkg-config gtk+-3.0 --libs`
 
-SRC = $(wildcard src/*.c)
-OBJ = $(SRC:.c=.o)
+SRC = $(wildcard src/lib/*.c)
+DEPS = $(SRC:.c=.o)
 
-BIN = salut
+BIN = salut duplex
 
-# DEV ONLY
-all:
-	make clean && make $(BIN) -j4
+all: $(BIN)
 
-# all: $(BIN)
+salut: src/salut.o $(DEPS)
+	@echo "LD $@"
+	@gcc $^ -o $@ $(LDFLAGS)
 
-$(BIN): $(OBJ)
+duplex: src/duplex.o $(DEPS)
 	@echo "LD $@"
 	@gcc $^ -o $@ $(LDFLAGS)
 
@@ -24,7 +24,7 @@ $(BIN): $(OBJ)
 	@gcc -c $< -o $@ $(CFLAGS)
 
 clean:
-	@echo "RM $(OBJ) $(BIN)"
-	@rm -f $(OBJ) $(BIN)
+	@echo "RM $(DEPS) $(BIN)"
+	@rm -f $(DEPS) $(BIN) src/salut.o src/duplex.o
 
 .PHONY: all clean
